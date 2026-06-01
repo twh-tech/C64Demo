@@ -495,7 +495,8 @@ OFFSCREEN_WORK:
 
         // Call SID player — has Phase4 + Phase1 time combined
         jsr     $180c
-		jsr DOSCROLL
+		jsr     UPDATESPEED
+		jsr		DOSCROLL
 		
         // -------------------------------------------------------
         // PHASE FLIP LOGIC — currently hardcoded, no flipping.
@@ -552,10 +553,11 @@ OFFSCREEN_WORK_SKIP:
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
-        // Call SID player once per frame — commented out for now
-       // jsr     $180c
+        // Call SID player
+        jsr     $180c
         
-        jsr DOSCROLL
+		jsr     UPDATESPEED
+        jsr		DOSCROLL
         
         lda     #$02
         sta     VICBORDER
@@ -683,7 +685,28 @@ COPYRIGHT:
         dex
         bpl     COPYRIGHT
         rts
-// Scroll text
+
+UPDATESPEED:
+        // Only advance speed table every 6 frames for smooth transitions
+        inc     SPEEDDELAY
+        lda     SPEEDDELAY
+        cmp     #6              // change this value to adjust smoothness
+        bne     SPEEDDONE
+        lda     #0
+        sta     SPEEDDELAY
+
+        // Advance speed table
+        ldx     SPEEDIDX
+        lda     SPEEDTABLE,x
+        sta     SCROLLSPEED
+        inx
+        cpx     #SPEEDTABLE_SIZE
+        bne     SAVEIDX
+        ldx     #0
+SAVEIDX:
+        stx     SPEEDIDX
+SPEEDDONE:
+        rts
 
 SCROLLSPEED:
         .byte $1                 // initial speed: 1 pixel/frame left
@@ -698,6 +721,25 @@ SCROLLTEXT:
         .byte 8,5,12,12,15,32,20,8,9,19,32,9,19,32,1,32,19,13,15,15,20,8,32
         .byte 19,3,18,15,12,12,5,18,32,15,14,32,20,8,5,32,3,54,52,32,32,32
         .byte $ff
+SPEEDIDX:
+        .byte 0                 // current index into speed table
+SPEEDDELAY:
+        .byte 0                 // counts frames between speed table steps
+SPEEDTABLE:
+        // Ramp up left
+        .byte 1,1,1,2,2,2,3,3,3,4,4,4,5,5,5
+        // Hold at max left speed
+        .fill 30, 5
+        // Ramp down to zero
+        .byte 4,4,4,3,3,3,2,2,2,1,1,1,0,0,0
+        // Ramp into reverse
+        .byte $ff,$ff,$ff,$fe,$fe,$fe,$fd,$fd,$fd,$fc,$fc,$fc,$fb,$fb,$fb
+        // Hold at reverse speed
+        .fill 10, $fb
+        // Ramp back to zero
+        .byte $fc,$fc,$fc,$fd,$fd,$fd,$fe,$fe,$fe,$ff,$ff,$ff,0,0,0
+.label SPEEDTABLE_END = *
+.label SPEEDTABLE_SIZE = SPEEDTABLE_END - SPEEDTABLE
 
 .align 256
 COLORTABLE:
