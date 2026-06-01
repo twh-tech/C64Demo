@@ -48,6 +48,7 @@ START:
         // occasionally delaying our raster IRQ and causing flicker.
         lda     #$7f
         sta     $dc0d
+        lda     $dc0d       // read back to acknowledge any pending interrupt
 
         // Hook $0314 — KERNAL and BASIC stay mapped
         lda     #<IRQ1
@@ -116,14 +117,14 @@ COPYINIT:
         // Init scroll position
         lda     #0
         sta     SCROLLCNT
-        lda     #7
+        lda		#7
         sta     SCROLLX
 
-		// Clear screen
-		jsr $E544
+        // Clear screen
+        jsr     $E544
 
-		// Change text colors
-        lda     #$00           // white (or any color 0-15)
+        // Set all color RAM to black
+        lda     #$00
         ldx     #$00
 COLORLOOP:
         sta     $d800,x
@@ -132,7 +133,6 @@ COLORLOOP:
         sta     $dae8,x
         inx
         bne     COLORLOOP
-
         cli
 MAINLOOP:
         jmp MAINLOOP   // infinite loop, CPU spins here between IRQs
@@ -142,7 +142,7 @@ IRQ1:
         lda     VICIRQFLAG
         and     #$01
         bne     IS_RASTER
-        jmp     $EA31
+        rti                 // not a raster IRQ — just return, don't call KERNAL
 
 IS_RASTER:
         lda     #$01
@@ -495,7 +495,6 @@ OFFSCREEN_WORK:
 
         // Call SID player — has Phase4 + Phase1 time combined
         jsr     $180c
-
 		jsr DOSCROLL
 		
         // -------------------------------------------------------
@@ -574,72 +573,126 @@ OFFSCREEN_WORK_SKIP:
         pla
         rti
 
-// Scroll text
+
 DOSCROLL:
-        // Decrement fine scroll
+        // Subtract signed speed from fine scroll position each frame.
+        // SCROLLX counts 7..0, written directly to $D016 bits 0-2.
+        // Positive speed = scroll left, negative speed = scroll right.
         lda     SCROLLX
-        beq     COARSESCROLL   // was 0, time for coarse scroll
-        // Just decrement and write scroll register
-        dec     SCROLLX
-        lda     #%11110000     // clear bits 0-3 (scroll bits + 38col bit)
-        and     VICXSCROLL
-        ora     SCROLLX        // bits 0-2 = fine scroll, bit 3 = 0 = 38 col mode
-        sta     VICXSCROLL
+        sec
+        sbc     SCROLLSPEED         // subtract speed from current position
+        bmi     NEEDCOARSELEFT      // result < 0: need coarse scroll left
+        cmp     #8
+        bcs     NEEDCOARSERIGHT     // result > 7: need coarse scroll right
+        sta     SCROLLX             // result 0-7: just save and write
+        jmp     WRITESCROLL
+
+NEEDCOARSELEFT:
+        // Result went below 0 — add 8 to wrap and shift buffer left
+        clc
+        adc     #8                  // bring back into 0-7 range
+        sta     SCROLLX
+        jsr     COARSELEFT
+        jmp     WRITESCROLL
+
+NEEDCOARSERIGHT:
+        // Result went above 7 — subtract 8 to wrap and shift buffer right
+        sec
+        sbc     #8                  // bring back into 0-7 range
+        sta     SCROLLX
+        jsr     COARSERIGHT
+        jmp     WRITESCROLL
+
+WRITESCROLL:
+        lda     VICXSCROLL
+        and     #%11110000          // clear bits 0-3, preserve bits 4-7
+        ora     SCROLLX             // OR in fine scroll value (0-7)
+        sta     VICXSCROLL          // write to VIC
         rts
 
-COARSESCROLL:
-        // Reset fine scroll to 7
-        lda     #7
-        sta     SCROLLX
-        lda     #%11110000     // clear bits 0-3
-        and     VICXSCROLL
-        ora     #7             // bits 0-2 = 7, bit 3 = 0 = 38 col mode
-        sta     VICXSCROLL
-
-        // Shift scroll buffer left by one (positions 0..38 = positions 1..39)
+// -------------------------------------------------------
+// COARSELEFT: shift buffer left, fetch next char into pos 39
+// -------------------------------------------------------
+COARSELEFT:
         ldx     #0
-SHIFTBUF:
+SHIFTLEFT:
         lda     SCROLLBUF+1,x
         sta     SCROLLBUF,x
         inx
         cpx     #39
-        bne     SHIFTBUF
+        bne     SHIFTLEFT
 
-        // Fetch next character from scroll text into position 39
+        // Fetch next character
         ldx     SCROLLCNT
         lda     SCROLLTEXT,x
-        cmp     #$ff           // end of text?
-        bne     GOTCHAR
-        ldx     #0             // wrap to start
-        stx     SCROLLCNT      // reset counter to 0
-        lda     SCROLLTEXT,x
-        inx                    // now increment to 1
+        cmp     #$ff                // end of text?
+        bne     GOTLEFT
+        ldx     #0                  // wrap to start
         stx     SCROLLCNT
-        jmp     STORECHAR
-
-GOTCHAR:
+        lda     SCROLLTEXT,x
         inx
         stx     SCROLLCNT
-
-STORECHAR:
+        jmp     STORELEFT
+GOTLEFT:
+        inx
+        stx     SCROLLCNT
+STORELEFT:
         sta     SCROLLBUF+39
-
-        // Copy buffer to screen RAM — always start at 39
         ldx     #39
-COPYBUF:
+COPYLEFT:
         lda     SCROLLBUF,x
         sta     SCROLLRAM,x
         dex
-        bpl     COPYBUF
+        bpl     COPYLEFT
         rts
 
+// -------------------------------------------------------
+// COARSERIGHT: shift buffer right, fetch previous char into pos 0
+// -------------------------------------------------------
+COARSERIGHT:
+        ldx     #38
+SHIFTRIGHT:
+        lda     SCROLLBUF,x
+        sta     SCROLLBUF+1,x
+        dex
+        bpl     SHIFTRIGHT
 
+        // Fetch previous character
+        ldx     SCROLLCNT
+        dex                         // go back one
+        bpl     GOTRIGHT
+        // Underflow — find end of text and wrap
+        ldx     #0
+FINDEND:
+        lda     SCROLLTEXT,x
+        cmp     #$ff
+        beq     FOUNDEND
+        inx
+        jmp     FINDEND
+FOUNDEND:
+        dex                         // step back from $ff to last real char
+GOTRIGHT:
+        stx     SCROLLCNT
+        lda     SCROLLTEXT,x
+        sta     SCROLLBUF+0
+
+        ldx     #39
+COPYRIGHT:
+        lda     SCROLLBUF,x
+        sta     SCROLLRAM,x
+        dex
+        bpl     COPYRIGHT
+        rts
+// Scroll text
+
+SCROLLSPEED:
+        .byte $1                 // initial speed: 1 pixel/frame left
 SCROLLX:
-        .byte 7                // current fine scroll value (counts down 7..0)
+        .byte 7                 // current fine scroll value (0-7)
 SCROLLCNT:
-        .byte 0                // scroll text character index
+        .byte 0                 // current position in scroll text
 SCROLLBUF:
-        .fill 41, 0            // 41-byte working buffer (40 visible + 1 incoming)
+        .fill 41, 0             // 41-byte working buffer
 SCROLLTEXT:
         // "HELLO THIS IS A SMOOTH SCROLLER ON THE C64   "
         .byte 8,5,12,12,15,32,20,8,9,19,32,9,19,32,1,32,19,13,15,15,20,8,32
