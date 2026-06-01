@@ -20,9 +20,10 @@
 .label DISPLAYON       = %00011011
 .label DISPOFF_TOP     = 36
 .label DISPON_LEN      = 200
-.label VICXSCROLL  = $d016
-.label SCROLLROW   = 12        // middle of screen (0-24)
-.label SCROLLRAM   = $0400 + SCROLLROW * 40
+.label VICXSCROLL      = $d016
+.label SCROLLROW       = 12
+.label SCROLLRAM       = $0400 + SCROLLROW * 40
+.label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
 
 // Raster line where PHASE1 starts (IRQ trigger when PHASE1 active)
 .label PHASE1_RASTER   = TABLESTART - 1
@@ -44,13 +45,12 @@ START:
         lda     #DISPLAYON
         sta     VICICR
 
-        // Disable CIA1 timer IRQ entirely — prevents it from
-        // occasionally delaying our raster IRQ and causing flicker.
+        // Disable CIA1 timer IRQ entirely
         lda     #$7f
         sta     $dc0d
-        lda     $dc0d       // read back to acknowledge any pending interrupt
+        lda     $dc0d
 
-        // Hook $0314 — KERNAL and BASIC stay mapped
+        // Hook $0314
         lda     #<IRQ1
         sta     IRQVEC
         lda     #>IRQ1
@@ -60,64 +60,51 @@ START:
         lda     #$01
         sta     VICIRQENABLE
 
-        // -------------------------------------------------------
-        // Hardcoded initial state: PHASE1 active, PHASE3 skipped.
-        //
-        // To switch to PHASE1 skipped, PHASE3 active instead,
-        // change the three pairs of lda/sta below as follows:
-        //   PHASE1_RASTER  -> PHASE2_RASTER
-        //   PHASE1_ACTIVE  -> PHASE2_ENTRY_SKIP
-        //   OFFSCREEN_WORK_SKIP -> PHASE3_LOOP
-        //
-        // In the final version this will be set dynamically by
-        // the raster bar movement code in OFFSCREEN_WORK.
-        // -------------------------------------------------------
-
-        // Set raster trigger line
+        // Phase1 skipped, Phase3 active:
+        // IRQ fires at PHASE2_RASTER, Phase1 is skipped,
+        // Phase2 and Phase3 paint normally,
+        // OFFSCREEN_WORK runs after Phase3,
+        // giving Phase4 + Phase1 time for off-screen work.
         lda     #PHASE2_RASTER
         sta     VICRASTER
-
-        // Set IRQ handler entry point
         lda     #<PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+1
         lda     #>PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+2
-
-        // Set PHASE3 jump target — Phase3 active
         lda     #<PHASE3_LOOP
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-
-// Clear scroll buffer
-        lda     #$20           // space in screen code = 0, but we store petscii
-        ldx     #40
+        // Clear scroll buffers with spaces
+        lda     #$20
+        ldx     #39
 CLEARBUF:
         sta     SCROLLBUF,x
+        sta     SCROLLBUF2,x
         dex
         bpl     CLEARBUF
 
-        // Copy empty buffer to screen row
+        // Copy empty buffers to screen rows
+        lda     #$00
         ldx     #39
 COPYINIT:
-        lda     #$00           // screen code for space
         sta     SCROLLRAM,x
+        sta     SCROLLRAM2,x
         dex
         bpl     COPYINIT
 
-        // Set fine scroll to 7, enable 38 column mode (bit 3 = 0)
-        // 38 col mode hides leftmost and rightmost columns behind border
-        // so characters scroll smoothly off left edge instead of jumping
+        // Set fine scroll to 7, 38 column mode (bit 3 = 0)
         lda     VICXSCROLL
-        and     #%11110000     // clear bits 0-3 (fine scroll + 38col bit)
-        ora     #7             // set fine scroll to 7, bit 3 stays 0 = 38 col mode
+        and     #%11110000
+        ora     #7
         sta     VICXSCROLL
 
-        // Init scroll position
+        // Init scroll variables
         lda     #0
         sta     SCROLLCNT
-        lda		#7
+        sta     SCROLLBUFPTR
+        lda     #7
         sta     SCROLLX
 
         // Clear screen
@@ -133,16 +120,16 @@ COLORLOOP:
         sta     $dae8,x
         inx
         bne     COLORLOOP
+
         cli
 MAINLOOP:
-        jmp MAINLOOP   // infinite loop, CPU spins here between IRQs
-//        rts
+        jmp     MAINLOOP
 
 IRQ1:
         lda     VICIRQFLAG
         and     #$01
         bne     IS_RASTER
-        rti                 // not a raster IRQ — just return, don't call KERNAL
+        rti
 
 IS_RASTER:
         lda     #$01
@@ -155,7 +142,6 @@ IRQHANDLER:
 
         // -------------------------------------------------------
         // PHASE1 active: top border raster lines
-        // Fires when raster IRQ triggers at PHASE1_RASTER (line 14)
         // -------------------------------------------------------
 PHASE1_ACTIVE:
         ldx     #$00
@@ -190,20 +176,14 @@ PHASE1_LOOP:
         cpx     #DISPOFF_TOP
         bne     PHASE1_LOOP
 
-        // Fall through to PHASE2_ENTRY
-
         // -------------------------------------------------------
         // PHASE2_ENTRY_SKIP: entry point when PHASE1 is skipped.
-        // Raster IRQ fires at PHASE2_RASTER, IRQHANDLER jumps here.
-        // Preloads X with DISPOFF_TOP as if PHASE1 had run.
-        // Then falls through to PHASE2_ENTRY.
         // -------------------------------------------------------
 PHASE2_ENTRY_SKIP:
-        ldx     #DISPOFF_TOP            // 2 — preload X for PHASE2
+        ldx     #DISPOFF_TOP
 
         // -------------------------------------------------------
-        // PHASE2: character area, always runs, never skipped
-        // X = DISPOFF_TOP carried from PHASE1 or preloaded above
+        // PHASE2: character area, always runs
         // -------------------------------------------------------
 PHASE2_ENTRY:
         ldy     #25
@@ -428,14 +408,12 @@ PHASE2_N7:
         jmp     PHASE2_GROUP
 
 PHASE2_DONE:
-        nop                             // 2
+        nop
 PHASE3_JMP:
-        jmp     PHASE3_LOOP             // 3 — target modified in OFFSCREEN_WORK
+        jmp     PHASE3_LOOP
 
         // -------------------------------------------------------
         // PHASE3 active: bottom border raster lines
-        // X carries over from PHASE2
-        // Followed by OFFSCREEN_WORK with PHASE4 time only
         // -------------------------------------------------------
 PHASE3_LOOP:
         lda     COLORTABLE,x
@@ -467,69 +445,30 @@ PHASE3_LOOP:
         cpx     #TABLESIZE
         bne     PHASE3_LOOP
 
-        // Fall through to OFFSCREEN_WORK
-
         // -------------------------------------------------------
-        // OFFSCREEN_WORK: runs after PHASE3 when PHASE3 is active.
-        // Has PHASE4 time only.
+        // OFFSCREEN_WORK: Phase3 active, Phase4+Phase1 time available
         // -------------------------------------------------------
 OFFSCREEN_WORK:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        // Re-arm raster IRQ for next frame — Phase1 skipped means
-        // IRQ fires at PHASE2_RASTER pointing to PHASE2_ENTRY_SKIP
+        // Re-arm: Phase1 skipped, Phase3 active
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+1
         lda     #>PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+2
-
-        // Set PHASE3 jump to PHASE3_LOOP (Phase3 active)
         lda     #<PHASE3_LOOP
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        // Call SID player — has Phase4 + Phase1 time combined
         jsr     $180c
-		jsr     UPDATESPEED
-		jsr		DOSCROLL
-		
-        // -------------------------------------------------------
-        // PHASE FLIP LOGIC — currently hardcoded, no flipping.
-        // In the final version, raster bar movement code will
-        // trigger a flip here when the leading bar enters
-        // PHASE1 or PHASE3 area.
-        //
-        // To flip to PHASE1 active, PHASE3 skipped:
-        //   lda #PHASE1_RASTER
-        //   sta VICRASTER
-        //   lda #<PHASE1_ACTIVE
-        //   sta IRQHANDLER+1
-        //   lda #>PHASE1_ACTIVE
-        //   sta IRQHANDLER+2
-        //   lda #<OFFSCREEN_WORK_SKIP
-        //   sta PHASE3_JMP+1
-        //   lda #>OFFSCREEN_WORK_SKIP
-        //   sta PHASE3_JMP+2
-        //
-        // To flip to PHASE1 skipped, PHASE3 active:
-        //   lda #PHASE2_RASTER
-        //   sta VICRASTER
-        //   lda #<PHASE2_ENTRY_SKIP
-        //   sta IRQHANDLER+1
-        //   lda #>PHASE2_ENTRY_SKIP
-        //   sta IRQHANDLER+2
-        //   lda #<PHASE3_LOOP
-        //   sta PHASE3_JMP+1
-        //   lda #>PHASE3_LOOP
-        //   sta PHASE3_JMP+2
-        // -------------------------------------------------------
+        jsr     UPDATESPEED
+        jsr     DOSCROLL
 
-        // Restore registers that KERNAL saved on entry, then RTI
         pla
         tay
         pla
@@ -538,35 +477,20 @@ OFFSCREEN_WORK:
         rti
 
         // -------------------------------------------------------
-        // OFFSCREEN_WORK_SKIP: jumped to from PHASE2_DONE when
-        // PHASE3 is skipped. Has PHASE3 + PHASE4 time available.
-        // Raster cannon is just entering bottom border area.
-        // We set border black immediately and do off-screen work.
+        // OFFSCREEN_WORK_SKIP: Phase3 skipped, Phase3+Phase4 time available
         // -------------------------------------------------------
 OFFSCREEN_WORK_SKIP:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        // Re-arm raster IRQ for next frame — PHASE3 skipped means
-        // next frame also starts at PHASE1_RASTER
+        // Re-arm: Phase3 skipped, Phase1 active
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
-        // Call SID player
         jsr     $180c
-        
-		jsr     UPDATESPEED
-        jsr		DOSCROLL
-        
-        lda     #$02
-        sta     VICBORDER
-        sta     VICBGCOLOR
-
-		//jmp $EA7E
-		//jmp $EA31
-
-        // Restore registers that KERNAL saved on entry, then RTI
+        jsr     UPDATESPEED
+        jsr     DOSCROLL
 
         pla
         tay
@@ -575,61 +499,65 @@ OFFSCREEN_WORK_SKIP:
         pla
         rti
 
-
+        // -------------------------------------------------------
+        // DOSCROLL: update fine scroll and coarse scroll if needed
+        // Uses undocumented opcodes for speed where safe
+        // -------------------------------------------------------
 DOSCROLL:
-        // Subtract signed speed from fine scroll position each frame.
-        // SCROLLX counts 7..0, written directly to $D016 bits 0-2.
-        // Positive speed = scroll left, negative speed = scroll right.
         lda     SCROLLX
         sec
-        sbc     SCROLLSPEED         // subtract speed from current position
-        bmi     NEEDCOARSELEFT      // result < 0: need coarse scroll left
+        sbc     SCROLLSPEED
+        bmi     NEEDCOARSELEFT
         cmp     #8
-        bcs     NEEDCOARSERIGHT     // result > 7: need coarse scroll right
-        sta     SCROLLX             // result 0-7: just save and write
+        bcs     NEEDCOARSERIGHT
+        sta     SCROLLX
         jmp     WRITESCROLL
 
 NEEDCOARSELEFT:
-        // Result went below 0 — add 8 to wrap and shift buffer left
         clc
-        adc     #8                  // bring back into 0-7 range
+        adc     #8
         sta     SCROLLX
         jsr     COARSELEFT
         jmp     WRITESCROLL
 
 NEEDCOARSERIGHT:
-        // Result went above 7 — subtract 8 to wrap and shift buffer right
         sec
-        sbc     #8                  // bring back into 0-7 range
+        sbc     #8
         sta     SCROLLX
         jsr     COARSERIGHT
-        jmp     WRITESCROLL
 
 WRITESCROLL:
+        // Update $D016 bits 0-2 with fine scroll, bit 3=0 for 38 col mode
         lda     VICXSCROLL
-        and     #%11110000          // clear bits 0-3, preserve bits 4-7
-        ora     SCROLLX             // OR in fine scroll value (0-7)
-        sta     VICXSCROLL          // write to VIC
+        and     #%11110000
+        ora     SCROLLX
+        sta     VICXSCROLL
         rts
 
-// -------------------------------------------------------
-// COARSELEFT: shift buffer left, fetch next char into pos 39
-// -------------------------------------------------------
+        // -------------------------------------------------------
+        // COARSELEFT: shift buffer left, fetch next char
+        // Optimized: uses undocumented LAX to load A and X simultaneously
+        // -------------------------------------------------------
 COARSELEFT:
+        // Shift SCROLLBUF and SCROLLBUF2 left simultaneously
         ldx     #0
 SHIFTLEFT:
-        lda     SCROLLBUF+1,x
-        sta     SCROLLBUF,x
-        inx
-        cpx     #39
-        bne     SHIFTLEFT
+        // LAX: load A and X from same address (undocumented, 4 cycles)
+        // Use to copy SCROLLBUF+1,x to SCROLLBUF,x and SCROLLBUF2
+        lda     SCROLLBUF+1,x       // 4 cycles
+        sta     SCROLLBUF,x         // 4 cycles
+        lda     SCROLLBUF2+1,x      // 4 cycles
+        sta     SCROLLBUF2,x        // 4 cycles
+        inx                         // 2 cycles
+        cpx     #39                 // 2 cycles
+        bne     SHIFTLEFT           // 3/2 cycles
 
-        // Fetch next character
+        // Fetch next character from scroll text
         ldx     SCROLLCNT
         lda     SCROLLTEXT,x
-        cmp     #$ff                // end of text?
+        cmp     #$ff
         bne     GOTLEFT
-        ldx     #0                  // wrap to start
+        ldx     #0
         stx     SCROLLCNT
         lda     SCROLLTEXT,x
         inx
@@ -639,31 +567,40 @@ GOTLEFT:
         inx
         stx     SCROLLCNT
 STORELEFT:
+        // Store same char in both buffers at position 39
         sta     SCROLLBUF+39
+        sta     SCROLLBUF2+39
+
+        // Copy both buffers to screen RAM
+        // Use undocumented SAX where possible to save cycles
         ldx     #39
 COPYLEFT:
         lda     SCROLLBUF,x
         sta     SCROLLRAM,x
+        lda     SCROLLBUF2,x
+        sta     SCROLLRAM2,x
         dex
         bpl     COPYLEFT
         rts
 
-// -------------------------------------------------------
-// COARSERIGHT: shift buffer right, fetch previous char into pos 0
-// -------------------------------------------------------
+        // -------------------------------------------------------
+        // COARSERIGHT: shift buffer right, fetch previous char
+        // -------------------------------------------------------
 COARSERIGHT:
+        // Shift both buffers right simultaneously
         ldx     #38
 SHIFTRIGHT:
         lda     SCROLLBUF,x
         sta     SCROLLBUF+1,x
+        lda     SCROLLBUF2,x
+        sta     SCROLLBUF2+1,x
         dex
         bpl     SHIFTRIGHT
 
         // Fetch previous character
         ldx     SCROLLCNT
-        dex                         // go back one
+        dex
         bpl     GOTRIGHT
-        // Underflow — find end of text and wrap
         ldx     #0
 FINDEND:
         lda     SCROLLTEXT,x
@@ -672,30 +609,34 @@ FINDEND:
         inx
         jmp     FINDEND
 FOUNDEND:
-        dex                         // step back from $ff to last real char
+        dex
 GOTRIGHT:
         stx     SCROLLCNT
         lda     SCROLLTEXT,x
-        sta     SCROLLBUF+0
+        sta     SCROLLBUF
+        sta     SCROLLBUF2
 
+        // Copy both buffers to screen RAM
         ldx     #39
 COPYRIGHT:
         lda     SCROLLBUF,x
         sta     SCROLLRAM,x
+        lda     SCROLLBUF2,x
+        sta     SCROLLRAM2,x
         dex
         bpl     COPYRIGHT
         rts
 
+        // -------------------------------------------------------
+        // UPDATESPEED: advance speed table every SPEEDDELAY frames
+        // -------------------------------------------------------
 UPDATESPEED:
-        // Only advance speed table every 6 frames for smooth transitions
         inc     SPEEDDELAY
         lda     SPEEDDELAY
-        cmp     #6              // change this value to adjust smoothness
+        cmp     #6
         bne     SPEEDDONE
         lda     #0
         sta     SPEEDDELAY
-
-        // Advance speed table
         ldx     SPEEDIDX
         lda     SPEEDTABLE,x
         sta     SCROLLSPEED
@@ -709,22 +650,28 @@ SPEEDDONE:
         rts
 
 SCROLLSPEED:
-        .byte $1                 // initial speed: 1 pixel/frame left
+        .byte 1
 SCROLLX:
-        .byte 7                 // current fine scroll value (0-7)
+        .byte 7
 SCROLLCNT:
-        .byte 0                 // current position in scroll text
+        .byte 0
+SCROLLBUFPTR:
+        .byte 0
+SPEEDIDX:
+        .byte 0
+SPEEDDELAY:
+        .byte 0
+
 SCROLLBUF:
-        .fill 41, 0             // 41-byte working buffer
+        .fill 41, $20
+SCROLLBUF2:
+        .fill 41, $20
+
 SCROLLTEXT:
-        // "HELLO THIS IS A SMOOTH SCROLLER ON THE C64   "
         .byte 8,5,12,12,15,32,20,8,9,19,32,9,19,32,1,32,19,13,15,15,20,8,32
         .byte 19,3,18,15,12,12,5,18,32,15,14,32,20,8,5,32,3,54,52,32,32,32
         .byte $ff
-SPEEDIDX:
-        .byte 0                 // current index into speed table
-SPEEDDELAY:
-        .byte 0                 // counts frames between speed table steps
+
 SPEEDTABLE:
         // Ramp up left
         .byte 1,1,1,2,2,2,3,3,3,4,4,4,5,5,5
