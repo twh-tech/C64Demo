@@ -60,11 +60,7 @@ START:
         lda     #$01
         sta     VICIRQENABLE
 
-        // Phase1 skipped, Phase3 active:
-        // IRQ fires at PHASE2_RASTER, Phase1 is skipped,
-        // Phase2 and Phase3 paint normally,
-        // OFFSCREEN_WORK runs after Phase3,
-        // giving Phase4 + Phase1 time for off-screen work.
+        // Phase1 skipped, Phase3 active
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -76,17 +72,9 @@ START:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        // Clear scroll buffers with spaces
+        // Circular buffers are pre-filled with $20 (spaces) in declarations
+        // Copy initial buffer contents to screen RAM
         lda     #$20
-        ldx     #39
-CLEARBUF:
-        sta     SCROLLBUF,x
-        sta     SCROLLBUF2,x
-        dex
-        bpl     CLEARBUF
-
-        // Copy empty buffers to screen rows
-        lda     #$00
         ldx     #39
 COPYINIT:
         sta     SCROLLRAM,x
@@ -135,8 +123,6 @@ IS_RASTER:
         lda     #$01
         sta     VICIRQFLAG
 
-        // Self-modifying jump — target is either PHASE1_ACTIVE
-        // or PHASE2_ENTRY_SKIP depending on which phase is active
 IRQHANDLER:
         jmp     PHASE1_ACTIVE
 
@@ -176,15 +162,9 @@ PHASE1_LOOP:
         cpx     #DISPOFF_TOP
         bne     PHASE1_LOOP
 
-        // -------------------------------------------------------
-        // PHASE2_ENTRY_SKIP: entry point when PHASE1 is skipped.
-        // -------------------------------------------------------
 PHASE2_ENTRY_SKIP:
         ldx     #DISPOFF_TOP
 
-        // -------------------------------------------------------
-        // PHASE2: character area, always runs
-        // -------------------------------------------------------
 PHASE2_ENTRY:
         ldy     #25
 
@@ -412,9 +392,6 @@ PHASE2_DONE:
 PHASE3_JMP:
         jmp     PHASE3_LOOP
 
-        // -------------------------------------------------------
-        // PHASE3 active: bottom border raster lines
-        // -------------------------------------------------------
 PHASE3_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
@@ -453,7 +430,6 @@ OFFSCREEN_WORK:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        // Re-arm: Phase1 skipped, Phase3 active
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -484,7 +460,6 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        // Re-arm: Phase3 skipped, Phase1 active
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
@@ -500,8 +475,7 @@ OFFSCREEN_WORK_SKIP:
         rti
 
         // -------------------------------------------------------
-        // DOSCROLL: update fine scroll and coarse scroll if needed
-        // Uses undocumented opcodes for speed where safe
+        // DOSCROLL: update fine scroll, coarse scroll if needed
         // -------------------------------------------------------
 DOSCROLL:
         lda     SCROLLX
@@ -527,7 +501,6 @@ NEEDCOARSERIGHT:
         jsr     COARSERIGHT
 
 WRITESCROLL:
-        // Update $D016 bits 0-2 with fine scroll, bit 3=0 for 38 col mode
         lda     VICXSCROLL
         and     #%11110000
         ora     SCROLLX
@@ -535,27 +508,26 @@ WRITESCROLL:
         rts
 
         // -------------------------------------------------------
-        // COARSELEFT: shift buffer left, fetch next char
-        // Optimized: uses undocumented LAX to load A and X simultaneously
+        // COARSELEFT: advance circular buffer pointer forward by 1,
+        // write new character at (ptr+39) mod 256,
+        // copy 40 chars from circular buffer to screen RAM.
+        // No shifting needed — pointer increment is the "shift".
         // -------------------------------------------------------
 COARSELEFT:
-        // Shift SCROLLBUF and SCROLLBUF2 left simultaneously
-        ldx     #0
-SHIFTLEFT:
-        // LAX: load A and X from same address (undocumented, 4 cycles)
-        // Use to copy SCROLLBUF+1,x to SCROLLBUF,x and SCROLLBUF2
-        lda     SCROLLBUF+1,x       // 4 cycles
-        sta     SCROLLBUF,x         // 4 cycles
-        lda     SCROLLBUF2+1,x      // 4 cycles
-        sta     SCROLLBUF2,x        // 4 cycles
-        inx                         // 2 cycles
-        cpx     #39                 // 2 cycles
-        bne     SHIFTLEFT           // 3/2 cycles
+        // Advance pointer — this is the entire "shift" operation
+        inc     SCROLLBUFPTR        // 5 cycles — replaces 897 cycle shift loop!
+
+        // New character position = (SCROLLBUFPTR + 39) mod 256
+        // Since buffers are page aligned, addition wraps automatically
+        lda     SCROLLBUFPTR
+        clc
+        adc     #39
+        tay                         // Y = position for new character
 
         // Fetch next character from scroll text
         ldx     SCROLLCNT
         lda     SCROLLTEXT,x
-        cmp     #$ff
+        cmp     #$ff                // end of text?
         bne     GOTLEFT
         ldx     #0
         stx     SCROLLCNT
@@ -567,37 +539,42 @@ GOTLEFT:
         inx
         stx     SCROLLCNT
 STORELEFT:
-        // Store same char in both buffers at position 39
-        sta     SCROLLBUF+39
-        sta     SCROLLBUF2+39
+        // Store new character in both circular buffers
+        sta     SCROLLBUF,y
+        sta     SCROLLBUF2,y
 
-        // Copy both buffers to screen RAM
-        // Use undocumented SAX where possible to save cycles
-        ldx     #39
+        // Copy 40 chars from both circular buffers to screen RAM
+        // X = buffer read position (wraps at 256 automatically)
+        // Y = screen RAM write position (0..39)
+        ldx     SCROLLBUFPTR
+        ldy     #0
 COPYLEFT:
         lda     SCROLLBUF,x
-        sta     SCROLLRAM,x
+        sta     SCROLLRAM,y
         lda     SCROLLBUF2,x
-        sta     SCROLLRAM2,x
-        dex
-        bpl     COPYLEFT
+        sta     SCROLLRAM2,y
+        inx                         // wraps at 256 automatically
+        iny
+        cpy     #40
+        bne     COPYLEFT
         rts
 
         // -------------------------------------------------------
-        // COARSERIGHT: shift buffer right, fetch previous char
+        // COARSERIGHT: decrement circular buffer pointer by 1,
+        // write new character at (ptr-1) mod 256,
+        // copy 40 chars from circular buffer to screen RAM.
         // -------------------------------------------------------
 COARSERIGHT:
-        // Shift both buffers right simultaneously
-        ldx     #38
-SHIFTRIGHT:
-        lda     SCROLLBUF,x
-        sta     SCROLLBUF+1,x
-        lda     SCROLLBUF2,x
-        sta     SCROLLBUF2+1,x
-        dex
-        bpl     SHIFTRIGHT
+        // Decrement pointer — replaces 897 cycle shift loop
+        dec     SCROLLBUFPTR        // 5 cycles
 
-        // Fetch previous character
+        // New character position = (SCROLLBUFPTR - 1) mod 256
+        lda     SCROLLBUFPTR
+        sec
+        sbc     #1
+        tay                         // Y = position for new character
+
+        // Fetch previous character from scroll text
         ldx     SCROLLCNT
         dex
         bpl     GOTRIGHT
@@ -613,22 +590,26 @@ FOUNDEND:
 GOTRIGHT:
         stx     SCROLLCNT
         lda     SCROLLTEXT,x
-        sta     SCROLLBUF
-        sta     SCROLLBUF2
+        // Store new character in both circular buffers
+        sta     SCROLLBUF,y
+        sta     SCROLLBUF2,y
 
-        // Copy both buffers to screen RAM
-        ldx     #39
+        // Copy 40 chars from both circular buffers to screen RAM
+        ldx     SCROLLBUFPTR
+        ldy     #0
 COPYRIGHT:
         lda     SCROLLBUF,x
-        sta     SCROLLRAM,x
+        sta     SCROLLRAM,y
         lda     SCROLLBUF2,x
-        sta     SCROLLRAM2,x
-        dex
-        bpl     COPYRIGHT
+        sta     SCROLLRAM2,y
+        inx
+        iny
+        cpy     #40
+        bne     COPYRIGHT
         rts
 
         // -------------------------------------------------------
-        // UPDATESPEED: advance speed table every SPEEDDELAY frames
+        // UPDATESPEED: advance speed table every 6 frames
         // -------------------------------------------------------
 UPDATESPEED:
         inc     SPEEDDELAY
@@ -661,11 +642,6 @@ SPEEDIDX:
         .byte 0
 SPEEDDELAY:
         .byte 0
-
-SCROLLBUF:
-        .fill 41, $20
-SCROLLBUF2:
-        .fill 41, $20
 
 SCROLLTEXT:
         .byte 8,5,12,12,15,32,20,8,9,19,32,9,19,32,1,32,19,13,15,15,20,8,32
@@ -709,6 +685,15 @@ COLORTABLE:
         .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
         .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
         .byte $00,$01,$02
+
+// Circular buffers must be page aligned so pointer wraps correctly
+.align 256
+SCROLLBUF:
+        .fill 256, $20          // 256-byte circular buffer line 1
+
+.align 256
+SCROLLBUF2:
+        .fill 256, $20          // 256-byte circular buffer line 2
 
 * = $1800
 .import binary "bombo.sid", 126
