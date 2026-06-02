@@ -25,11 +25,11 @@ start:
 loop:
 
     lda base
-    cmp #200
+    cmp #143
     bcs done
 
     lda x
-    cmp #38
+    cmp #40
     bcc draw
     jmp newline
 
