@@ -697,3 +697,7 @@ SCROLLBUF2:
 
 * = $1800
 .import binary "bombo.sid", 126
+
+* = $2800
+.var charset = LoadBinary("charset.bin", BF_C64FILE)
+.fill charset.getSize(), charset.get(i)

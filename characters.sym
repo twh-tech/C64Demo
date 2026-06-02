@@ -1,0 +1,9 @@
+.label next=$80b
+.label newline=$869
+.label loop=$820
+.label start=$810
+.label x=$87e
+.label draw=$831
+.label row=$87f
+.label done=$87a
+.label base=$880
