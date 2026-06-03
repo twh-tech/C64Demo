@@ -7,20 +7,21 @@
         .byte   $00,$00,$00
         *=$0810
 
+.label IRQVEC          = $0314
+.label VICICR          = $d011
+.label VICRASTER       = $d012
+.label VICXSCROLL      = $d016
+.label VICMEMCTRL      = $d018
+.label VICIRQFLAG      = $d019
 .label VICBORDER       = $d020
 .label VICBGCOLOR      = $d021
-.label VICRASTER       = $d012
-.label VICIRQFLAG      = $d019
 .label VICIRQENABLE    = $d01a
-.label VICICR          = $d011
-.label IRQVEC          = $0314
 .label TABLESTART      = 15
 .label TABLEND         = 288
 .label TABLESIZE       = TABLEND - TABLESTART
 .label DISPLAYON       = %00011011
 .label DISPOFF_TOP     = 36
 .label DISPON_LEN      = 200
-.label VICXSCROLL      = $d016
 .label SCROLLROW       = 12
 .label SCROLLRAM       = $0400 + SCROLLROW * 40
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
@@ -72,7 +73,6 @@ START:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        // Circular buffers are pre-filled with $20 (spaces) in declarations
         // Copy initial buffer contents to screen RAM
         lda     #$20
         ldx     #39
@@ -91,6 +91,7 @@ COPYINIT:
         // Init scroll variables
         lda     #0
         sta     SCROLLCNT
+        sta     SCROLLCNT2
         sta     SCROLLBUFPTR
         lda     #7
         sta     SCROLLX
@@ -108,6 +109,10 @@ COLORLOOP:
         sta     $dae8,x
         inx
         bne     COLORLOOP
+
+        // Point VIC to charset at $2800
+        lda     #%00011010
+        sta     VICMEMCTRL
 
         cli
 MAINLOOP:
@@ -429,7 +434,7 @@ OFFSCREEN_WORK:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
-
+		
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -508,44 +513,54 @@ WRITESCROLL:
         rts
 
         // -------------------------------------------------------
-        // COARSELEFT: advance circular buffer pointer forward by 1,
-        // write new character at (ptr+39) mod 256,
-        // copy 40 chars from circular buffer to screen RAM.
-        // No shifting needed — pointer increment is the "shift".
+        // COARSELEFT: advance circular buffer pointer,
+        // fetch next chars for both lines, copy to screen RAM
         // -------------------------------------------------------
 COARSELEFT:
-        // Advance pointer — this is the entire "shift" operation
-        inc     SCROLLBUFPTR        // 5 cycles — replaces 897 cycle shift loop!
+        inc     SCROLLBUFPTR
 
         // New character position = (SCROLLBUFPTR + 39) mod 256
-        // Since buffers are page aligned, addition wraps automatically
         lda     SCROLLBUFPTR
         clc
         adc     #39
         tay                         // Y = position for new character
 
-        // Fetch next character from scroll text
+        // Fetch next character for line 1
         ldx     SCROLLCNT
+SCROLLCNT_FETCH1:
         lda     SCROLLTEXT,x
-        cmp     #$ff                // end of text?
-        bne     GOTLEFT
+        cmp     #$ff
+        bne     GOTLEFT1
         ldx     #0
         stx     SCROLLCNT
         lda     SCROLLTEXT,x
         inx
         stx     SCROLLCNT
-        jmp     STORELEFT
-GOTLEFT:
+        jmp     STORELEFT1
+GOTLEFT1:
         inx
         stx     SCROLLCNT
-STORELEFT:
-        // Store new character in both circular buffers
+STORELEFT1:
         sta     SCROLLBUF,y
+
+        // Fetch next character for line 2
+        ldx     SCROLLCNT2
+        lda     SCROLLTEXT2,x
+        cmp     #$ff
+        bne     GOTLEFT2
+        ldx     #0
+        stx     SCROLLCNT2
+        lda     SCROLLTEXT2,x
+        inx
+        stx     SCROLLCNT2
+        jmp     STORELEFT2
+GOTLEFT2:
+        inx
+        stx     SCROLLCNT2
+STORELEFT2:
         sta     SCROLLBUF2,y
 
-        // Copy 40 chars from both circular buffers to screen RAM
-        // X = buffer read position (wraps at 256 automatically)
-        // Y = screen RAM write position (0..39)
+        // Copy both buffers to screen RAM
         ldx     SCROLLBUFPTR
         ldy     #0
 COPYLEFT:
@@ -553,48 +568,69 @@ COPYLEFT:
         sta     SCROLLRAM,y
         lda     SCROLLBUF2,x
         sta     SCROLLRAM2,y
-        inx                         // wraps at 256 automatically
+        inx
         iny
         cpy     #40
         bne     COPYLEFT
         rts
 
         // -------------------------------------------------------
-        // COARSERIGHT: decrement circular buffer pointer by 1,
-        // write new character at (ptr-1) mod 256,
-        // copy 40 chars from circular buffer to screen RAM.
+        // COARSERIGHT: decrement circular buffer pointer,
+        // fetch previous chars for both lines, copy to screen RAM
         // -------------------------------------------------------
 COARSERIGHT:
-        // Decrement pointer — replaces 897 cycle shift loop
-        dec     SCROLLBUFPTR        // 5 cycles
+        dec     SCROLLBUFPTR
 
-        // New character position = (SCROLLBUFPTR - 1) mod 256
+        // New character position = SCROLLBUFPTR (before decrement = old ptr - 1)
         lda     SCROLLBUFPTR
-        sec
-        sbc     #1
         tay                         // Y = position for new character
 
-        // Fetch previous character from scroll text
+        // Fetch previous character for line 1
+        // SCROLLCNT points to next char to fetch going left,
+        // so going right we need to go back 2 positions
         ldx     SCROLLCNT
         dex
-        bpl     GOTRIGHT
+        //dex
+        bpl     GOTRIGHT1
+        // underflow — find end of text
         ldx     #0
-FINDEND:
+FINDEND1:
         lda     SCROLLTEXT,x
         cmp     #$ff
-        beq     FOUNDEND
+        beq     FOUNDEND1
         inx
-        jmp     FINDEND
-FOUNDEND:
-        dex
-GOTRIGHT:
+        jmp     FINDEND1
+FOUNDEND1:
+        dex                         // step back from $ff to last real char
+        bpl     GOTRIGHT1
+        ldx     #0                  // text is empty, use 0
+GOTRIGHT1:
         stx     SCROLLCNT
         lda     SCROLLTEXT,x
-        // Store new character in both circular buffers
         sta     SCROLLBUF,y
+
+        // Fetch previous character for line 2
+        ldx     SCROLLCNT2
+        dex
+        //dex
+        bpl     GOTRIGHT2
+        ldx     #0
+FINDEND2:
+        lda     SCROLLTEXT2,x
+        cmp     #$ff
+        beq     FOUNDEND2
+        inx
+        jmp     FINDEND2
+FOUNDEND2:
+        dex
+        bpl     GOTRIGHT2
+        ldx     #0
+GOTRIGHT2:
+        stx     SCROLLCNT2
+        lda     SCROLLTEXT2,x
         sta     SCROLLBUF2,y
 
-        // Copy 40 chars from both circular buffers to screen RAM
+        // Copy both buffers to screen RAM
         ldx     SCROLLBUFPTR
         ldy     #0
 COPYRIGHT:
@@ -636,6 +672,8 @@ SCROLLX:
         .byte 7
 SCROLLCNT:
         .byte 0
+SCROLLCNT2:
+        .byte 0
 SCROLLBUFPTR:
         .byte 0
 SPEEDIDX:
@@ -643,9 +681,14 @@ SPEEDIDX:
 SPEEDDELAY:
         .byte 0
 
+.align 256
 SCROLLTEXT:
-        .byte 8,5,12,12,15,32,20,8,9,19,32,9,19,32,1,32,19,13,15,15,20,8,32
-        .byte 19,3,18,15,12,12,5,18,32,15,14,32,20,8,5,32,3,54,52,32,32,32
+        .import binary "scroll_top.bin"
+        .byte $ff
+
+.align 256
+SCROLLTEXT2:
+        .import binary "scroll_bot.bin"
         .byte $ff
 
 SPEEDTABLE:
@@ -686,18 +729,22 @@ COLORTABLE:
         .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
         .byte $00,$01,$02
 
-// Circular buffers must be page aligned so pointer wraps correctly
-.align 256
+* = $3000
 SCROLLBUF:
-        .fill 256, $20          // 256-byte circular buffer line 1
+        .fill 256, $20
 
-.align 256
+* = $3100
 SCROLLBUF2:
-        .fill 256, $20          // 256-byte circular buffer line 2
+        .fill 256, $20
 
 * = $1800
 .import binary "bombo.sid", 126
 
 * = $2800
-.var charset = LoadBinary("charset.bin", BF_C64FILE)
+.var charset = LoadBinary("ace2char.bin", BF_C64FILE)
 .fill charset.getSize(), charset.get(i)
+
+.print "SCROLLRAM = $"+toHexString(SCROLLRAM)
+.print "SCROLLRAM2 = $"+toHexString(SCROLLRAM2)
+.print "SCROLLBUF = $"+toHexString(SCROLLBUF)
+.print "SCROLLBUF2 = $"+toHexString(SCROLLBUF2)
