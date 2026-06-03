@@ -19,19 +19,15 @@ def build_char_map():
     code = 0
     for ch in order:
         if ch in (' ', 'J'):
-            # 1-wide: top=code, bottom=code+1
             charmap[ch] = ([code], [code + 1])
             code += 2
         elif ch == 'W':
-            # 3-wide: tl, tm, tr on top; bl, bm, br on bottom
             charmap['W'] = ([code, code + 2, code + 4],
                             [code + 1, code + 3, code + 5])
             code += 6
         else:
-            # 2-wide: top-left, top-right; bottom-left, bottom-right
             charmap[ch] = ([code, code + 2], [code + 1, code + 3])
             code += 4
-    # I comes after 0, gets the next available code
     charmap['I'] = ([code], [code + 1])
     return charmap
 
@@ -40,24 +36,29 @@ CHARMAP = build_char_map()
 def string_to_scroll_rows(text):
     top_row = []
     bottom_row = []
+    boundary = []      # 0 = first column of a character, 1 = continuation
     for ch in text.upper():
         if ch not in CHARMAP:
             print(f"WARNING: Unknown character '{ch}' — skipping", file=sys.stderr)
             continue
         top_tiles, bottom_tiles = CHARMAP[ch]
+        width = len(top_tiles)
         top_row.extend(top_tiles)
         bottom_row.extend(bottom_tiles)
-    return top_row, bottom_row
+        boundary.append(0)                  # first column of this char
+        boundary.extend([1] * (width - 1))  # continuation columns (0 for 1-wide chars)
+    return top_row, bottom_row, boundary
 
 def save_binary(filename, data):
     with open(filename, 'wb') as f:
         f.write(bytes(data))
     print(f"Saved {len(data)} bytes to: {filename}")
 
-def print_preview(text, top_row, bottom_row):
+def print_preview(text, top_row, bottom_row, boundary):
     print(f"\nInput:     {text.upper()}")
     print(f"Top row:   {' '.join(f'{b:02X}' for b in top_row)}")
     print(f"Bottom row:{' '.join(f'{b:02X}' for b in bottom_row)}")
+    print(f"Boundary:  {' '.join(str(b) for b in boundary)}")
     print(f"Width:     {len(top_row)} tiles")
 
 def main():
@@ -65,15 +66,17 @@ def main():
     text   = "AB CDE FGHI JKLM NOPQ RST UVWXYZ    1234567890    ABCDEFGHIJKLMNOPQRSTUVWXYZ     1234567890     "
     prefix = "scroll"
     # --------------------------------------------------
-    top_row, bottom_row = string_to_scroll_rows(text)
+    top_row, bottom_row, boundary = string_to_scroll_rows(text)
     if not top_row:
         print("ERROR: No valid characters in input.", file=sys.stderr)
         sys.exit(1)
     top_file = f"{prefix}_top.bin"
     bot_file = f"{prefix}_bot.bin"
+    bnd_file = f"{prefix}_bnd.bin"
     save_binary(top_file, top_row)
     save_binary(bot_file, bottom_row)
-    print_preview(text, top_row, bottom_row)
+    save_binary(bnd_file, boundary)
+    print_preview(text, top_row, bottom_row, boundary)
 
 if __name__ == "__main__":
     main()

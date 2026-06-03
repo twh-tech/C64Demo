@@ -92,6 +92,9 @@ COPYINIT:
         lda     #0
         sta     SCROLLCNT
         sta     SCROLLCNT2
+        sta     SCROLLCNTL
+        sta     SCROLLCNTL2
+        sta     SCROLLCNTL_RDY
         sta     SCROLLBUFPTR
         lda     #7
         sta     SCROLLX
@@ -434,7 +437,7 @@ OFFSCREEN_WORK:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
-		
+
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -560,6 +563,42 @@ GOTLEFT2:
 STORELEFT2:
         sta     SCROLLBUF2,y
 
+        // Advance left-edge counters, but only once SCROLLCNT has
+        // reached 40 — so SCROLLCNTL stays exactly 40 steps behind.
+        lda     SCROLLCNTL_RDY
+        bne     ADVANCELEFT
+
+        // Not ready yet — check if SCROLLCNT has reached 40
+        lda     SCROLLCNT
+        cmp     #40
+        bcc     SKIPCNTL        // SCROLLCNT < 40, don't advance yet
+        lda     #1
+        sta     SCROLLCNTL_RDY
+
+ADVANCELEFT:
+        ldx     SCROLLCNTL
+        lda     SCROLLTEXT,x
+        cmp     #$ff
+        bne     ADVANCELEFT1
+        ldx     #0
+        stx     SCROLLCNTL
+        inx
+ADVANCELEFT1:
+        inx
+        stx     SCROLLCNTL
+
+        ldx     SCROLLCNTL2
+        lda     SCROLLTEXT2,x
+        cmp     #$ff
+        bne     ADVANCELEFT2
+        ldx     #0
+        stx     SCROLLCNTL2
+        inx
+ADVANCELEFT2:
+        inx
+        stx     SCROLLCNTL2
+
+SKIPCNTL:
         // Copy both buffers to screen RAM
         ldx     SCROLLBUFPTR
         ldy     #0
@@ -581,52 +620,51 @@ COPYLEFT:
 COARSERIGHT:
         dec     SCROLLBUFPTR
 
-        // New character position = SCROLLBUFPTR (before decrement = old ptr - 1)
+        // New character position = SCROLLBUFPTR
         lda     SCROLLBUFPTR
         tay                         // Y = position for new character
 
-        // Fetch previous character for line 1
-        // SCROLLCNT points to next char to fetch going left,
-        // so going right we need to go back 2 positions
-        ldx     SCROLLCNT
+        // Fetch previous character for line 1 using left-edge counter
+        ldx     SCROLLCNTL
         dex
-        //dex
-        bpl     GOTRIGHT1
-        // underflow — find end of text
+        cpx		#$ff
+        bne     GOTRIGHT1
+        // Underflow — wrap to last character in text
         ldx     #0
 FINDEND1:
         lda     SCROLLTEXT,x
         cmp     #$ff
         beq     FOUNDEND1
         inx
-        jmp     FINDEND1
+        bne     FINDEND1
 FOUNDEND1:
-        dex                         // step back from $ff to last real char
-        bpl     GOTRIGHT1
-        ldx     #0                  // text is empty, use 0
+        dex
+        cpx     #$ff
+        bne     GOTRIGHT1
 GOTRIGHT1:
-        stx     SCROLLCNT
+        stx     SCROLLCNTL
         lda     SCROLLTEXT,x
         sta     SCROLLBUF,y
 
-        // Fetch previous character for line 2
-        ldx     SCROLLCNT2
+        // Fetch previous character for line 2 using left-edge counter
+        ldx     SCROLLCNTL2
         dex
-        //dex
-        bpl     GOTRIGHT2
+        cpx		#$ff
+        bne     GOTRIGHT2
+        // Underflow — wrap to last character in text
         ldx     #0
 FINDEND2:
         lda     SCROLLTEXT2,x
         cmp     #$ff
         beq     FOUNDEND2
         inx
-        jmp     FINDEND2
+        bne     FINDEND2
 FOUNDEND2:
         dex
-        bpl     GOTRIGHT2
+        cpx     GOTRIGHT2
         ldx     #0
 GOTRIGHT2:
-        stx     SCROLLCNT2
+        stx     SCROLLCNTL2
         lda     SCROLLTEXT2,x
         sta     SCROLLBUF2,y
 
@@ -673,6 +711,12 @@ SCROLLX:
 SCROLLCNT:
         .byte 0
 SCROLLCNT2:
+        .byte 0
+SCROLLCNTL:
+        .byte 0
+SCROLLCNTL2:
+        .byte 0
+SCROLLCNTL_RDY:
         .byte 0
 SCROLLBUFPTR:
         .byte 0
@@ -744,7 +788,13 @@ SCROLLBUF2:
 .var charset = LoadBinary("ace2char.bin", BF_C64FILE)
 .fill charset.getSize(), charset.get(i)
 
-.print "SCROLLRAM = $"+toHexString(SCROLLRAM)
-.print "SCROLLRAM2 = $"+toHexString(SCROLLRAM2)
+.print "SCROLLTEXT = $"+toHexString(SCROLLTEXT)
+.print "COARSERIGHT = $"+toHexString(COARSERIGHT)
+.print "SCROLLCNT = $"+toHexString(SCROLLCNT)
+.print "SCROLLCNTL = $"+toHexString(SCROLLCNTL)
 .print "SCROLLBUF = $"+toHexString(SCROLLBUF)
-.print "SCROLLBUF2 = $"+toHexString(SCROLLBUF2)
+.print "SCROLLSPEED = $"+toHexString(SCROLLSPEED)
+.print "SCROLLX = $"+toHexString(SCROLLX)
+.print "SCROLLCNTL_RDY = $"+toHexString(SCROLLCNTL_RDY)
+.print "ADVANCELEFT = $"+toHexString(ADVANCELEFT)
+.print "COARSELEFT = $"+toHexString(COARSELEFT)
