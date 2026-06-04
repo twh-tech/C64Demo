@@ -63,7 +63,7 @@ def print_preview(text, top_row, bottom_row, boundary):
 
 def main():
     # --- Edit these two values to change the output ---
-    text   = "AB CDE FGHI JKLM NOPQ RST UVWXYZ    1234567890    ABCDEFGHIJKLMNOPQRSTUVWXYZ     1234567890     "
+    text   = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
     prefix = "scroll"
     # --------------------------------------------------
     top_row, bottom_row, boundary = string_to_scroll_rows(text)

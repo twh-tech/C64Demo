@@ -96,6 +96,7 @@ COPYINIT:
         sta     SCROLLCNTL2
         sta     SCROLLCNTL_RDY
         sta     SCROLLBUFPTR
+        sta     SCROLLSIGN
         lda     #7
         sta     SCROLLX
 
@@ -449,9 +450,12 @@ OFFSCREEN_WORK:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        jsr     $180c
-        jsr     UPDATESPEED
+		// SID Player
+        //jsr     $180c
+        
+        // Scroll text
         jsr     DOSCROLL
+        jsr     UPDATESPEED
 
         pla
         tay
@@ -471,9 +475,12 @@ OFFSCREEN_WORK_SKIP:
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
-        jsr     $180c
-        jsr     UPDATESPEED
+		// SID Player
+        //jsr     $180c
+
+        // Scroll text        
         jsr     DOSCROLL
+        jsr     UPDATESPEED
 
         pla
         tay
@@ -530,14 +537,12 @@ COARSELEFT:
 
         // Fetch next character for line 1
         ldx     SCROLLCNT
-SCROLLCNT_FETCH1:
         lda     SCROLLTEXT,x
         cmp     #$ff
         bne     GOTLEFT1
-        ldx     #0
-        stx     SCROLLCNT
-        lda     SCROLLTEXT,x
-        inx
+        ldx     #0                  // wrap to start
+        lda     SCROLLTEXT,x        // read position 0
+        ldx     #1                  // next call starts at position 1
         stx     SCROLLCNT
         jmp     STORELEFT1
 GOTLEFT1:
@@ -551,10 +556,9 @@ STORELEFT1:
         lda     SCROLLTEXT2,x
         cmp     #$ff
         bne     GOTLEFT2
-        ldx     #0
-        stx     SCROLLCNT2
-        lda     SCROLLTEXT2,x
-        inx
+        ldx     #0                  // wrap to start
+        lda     SCROLLTEXT2,x       // read position 0
+        ldx     #1                  // next call starts at position 1
         stx     SCROLLCNT2
         jmp     STORELEFT2
 GOTLEFT2:
@@ -564,14 +568,14 @@ STORELEFT2:
         sta     SCROLLBUF2,y
 
         // Advance left-edge counters, but only once SCROLLCNT has
-        // reached 40 — so SCROLLCNTL stays exactly 40 steps behind.
+        // reached 41 — so SCROLLCNTL stays exactly 40 steps behind.
         lda     SCROLLCNTL_RDY
         bne     ADVANCELEFT
 
-        // Not ready yet — check if SCROLLCNT has reached 40
+        // Not ready yet — check if SCROLLCNT has reached 41
         lda     SCROLLCNT
-        cmp     #40
-        bcc     SKIPCNTL        // SCROLLCNT < 40, don't advance yet
+        cmp     #41
+        bcc     SKIPCNTL        // SCROLLCNT < 41, don't advance yet
         lda     #1
         sta     SCROLLCNTL_RDY
 
@@ -580,21 +584,21 @@ ADVANCELEFT:
         lda     SCROLLTEXT,x
         cmp     #$ff
         bne     ADVANCELEFT1
-        ldx     #0
-        stx     SCROLLCNTL
-        inx
+        ldx     #0                  // wrap to start
+        stx     SCROLLCNTL          // store 0, next call will advance to 1
+        jmp     ADVANCELEFT2
 ADVANCELEFT1:
         inx
         stx     SCROLLCNTL
-
+ADVANCELEFT2:
         ldx     SCROLLCNTL2
         lda     SCROLLTEXT2,x
         cmp     #$ff
-        bne     ADVANCELEFT2
-        ldx     #0
-        stx     SCROLLCNTL2
-        inx
-ADVANCELEFT2:
+        bne     ADVANCELEFT3
+        ldx     #0                  // wrap to start
+        stx     SCROLLCNTL2         // store 0, next call will advance to 1
+        jmp     SKIPCNTL
+ADVANCELEFT3:
         inx
         stx     SCROLLCNTL2
 
@@ -618,6 +622,16 @@ COPYLEFT:
         // fetch previous chars for both lines, copy to screen RAM
         // -------------------------------------------------------
 COARSERIGHT:
+        lda     SCROLLSIGN
+        cmp     #1
+        bne     COARSERIGHT_NODEBUG
+        lda     SCROLLCNTL
+        sta     DBG_CNTL
+        lda     SCROLLBUFPTR
+        sta     DBG_BUFPTR
+        lda     SCROLLCNT
+        sta     DBG_CNT
+COARSERIGHT_NODEBUG:
         dec     SCROLLBUFPTR
 
         // New character position = SCROLLBUFPTR
@@ -627,7 +641,7 @@ COARSERIGHT:
         // Fetch previous character for line 1 using left-edge counter
         ldx     SCROLLCNTL
         dex
-        cpx		#$ff
+        cpx     #$ff
         bne     GOTRIGHT1
         // Underflow — wrap to last character in text
         ldx     #0
@@ -649,7 +663,7 @@ GOTRIGHT1:
         // Fetch previous character for line 2 using left-edge counter
         ldx     SCROLLCNTL2
         dex
-        cpx		#$ff
+        cpx     #$ff
         bne     GOTRIGHT2
         // Underflow — wrap to last character in text
         ldx     #0
@@ -661,8 +675,8 @@ FINDEND2:
         bne     FINDEND2
 FOUNDEND2:
         dex
-        cpx     GOTRIGHT2
-        ldx     #0
+        cpx     #$ff
+        bne     GOTRIGHT2
 GOTRIGHT2:
         stx     SCROLLCNTL2
         lda     SCROLLTEXT2,x
@@ -683,7 +697,8 @@ COPYRIGHT:
         rts
 
         // -------------------------------------------------------
-        // UPDATESPEED: advance speed table every 6 frames
+        // UPDATESPEED: advance speed table every 6 frames,
+        // detect direction changes and realign char boundaries
         // -------------------------------------------------------
 UPDATESPEED:
         inc     SPEEDDELAY
@@ -701,7 +716,94 @@ UPDATESPEED:
         ldx     #0
 SAVEIDX:
         stx     SPEEDIDX
+
+        // --- Direction change detection ---
+        // SCROLLSIGN: 0 = was going left (positive speed)
+        //             1 = was going right (negative speed)
+        lda     SCROLLSPEED
+        bmi     SPEED_IS_NEG
+
+        // Speed is zero or positive (scrolling left)
+        lda     SCROLLSIGN
+        beq     SPEEDDONE           // already going left, no change
+        // Transition: right -> left
+        lda     #0
+        sta     SCROLLSIGN
+        jsr     ALIGNFORRIGHT
+        jmp     SPEEDDONE
+
+SPEED_IS_NEG:
+        // Speed is negative (scrolling right)
+        lda     SCROLLSIGN
+        bne     SPEEDDONE           // already going right, no change
+        // Transition: left -> right
+        lda     #1
+        sta     SCROLLSIGN
+        jsr     ALIGNFORLEFT
+
 SPEEDDONE:
+        rts
+
+ALIGNFORLEFT:
+        lda     SCROLLCNT
+        sec
+        sbc     #40
+        bcs     ALIGNFORLEFT_STORE
+        // Underflow — add text length to wrap correctly
+        clc
+        adc     #<TEXTLENGTH
+ALIGNFORLEFT_STORE:
+        sta     SCROLLCNTL
+        sta     SCROLLCNTL2
+        rts
+
+        // -------------------------------------------------------
+        // ALIGNFORRIGHT: called on right->left direction change.
+        // -------------------------------------------------------
+        // ALIGNFORRIGHT: called on right->left direction change.
+        //
+        // SCROLLCNT is not maintained during right-scroll so it is
+        // stale. Resync: SCROLLCNT = SCROLLCNTL + 40 (with $ff wrap)
+        // then walk forward to sit on the last column of a character
+        // so the next COARSELEFT inx lands on a clean boundary.
+        // -------------------------------------------------------
+ALIGNFORRIGHT:
+        lda     SCROLLCNTL
+        clc
+        adc     #40
+        tax                         // X = candidate position
+ALIGNRIGHT_WRAPCHECK:
+        lda     SCROLLTEXT,x
+        cmp     #$ff
+        bne     ALIGNRIGHT_NOWRAP
+        lda     #0
+        sta     SCROLLCNT
+ALIGNRIGHT_FINDWRAP:
+        inx
+        lda     SCROLLTEXT,x
+        cmp     #$ff
+        beq     ALIGNRIGHT_WRAPPED
+        inc     SCROLLCNT
+        bne     ALIGNRIGHT_FINDWRAP
+ALIGNRIGHT_WRAPPED:
+        lda     SCROLLCNT
+        tax
+        jmp     ALIGNRIGHT_SYNCED
+ALIGNRIGHT_NOWRAP:
+        stx     SCROLLCNT
+ALIGNRIGHT_SYNCED:
+        lda     SCROLLCNT
+        sta     SCROLLCNT2
+
+ALIGNFORRIGHT_LOOP:
+        ldx     SCROLLCNT
+        inx
+        lda     SCROLLBND,x
+        beq     ALIGNFORRIGHT_DONE
+        inc     SCROLLCNT
+        inc     SCROLLCNT2
+        jmp     ALIGNFORRIGHT_LOOP
+ALIGNFORRIGHT_DONE:
         rts
 
 SCROLLSPEED:
@@ -720,20 +822,35 @@ SCROLLCNTL_RDY:
         .byte 0
 SCROLLBUFPTR:
         .byte 0
+SCROLLSIGN:
+        .byte 0                     // 0=left, 1=right
 SPEEDIDX:
         .byte 0
 SPEEDDELAY:
+        .byte 0
+DBG_CNTL:
+        .byte 0
+DBG_BUFPTR:
+        .byte 0
+DBG_CNT:
         .byte 0
 
 .align 256
 SCROLLTEXT:
         .import binary "scroll_top.bin"
         .byte $ff
+.label TEXTLENGTH = * - SCROLLTEXT - 1   // length excluding $ff sentinel
 
 .align 256
 SCROLLTEXT2:
         .import binary "scroll_bot.bin"
         .byte $ff
+
+.align 256
+SCROLLBND:
+        .import binary "scroll_bnd.bin"
+        .byte $ff
+
 
 SPEEDTABLE:
         // Ramp up left
@@ -798,3 +915,7 @@ SCROLLBUF2:
 .print "SCROLLCNTL_RDY = $"+toHexString(SCROLLCNTL_RDY)
 .print "ADVANCELEFT = $"+toHexString(ADVANCELEFT)
 .print "COARSELEFT = $"+toHexString(COARSELEFT)
+.print "SCROLLBND = $"+toHexString(SCROLLBND)
+.print "SCROLLSIGN = $"+toHexString(SCROLLSIGN)
+.print "DBG_CNTL = $"+toHexString(DBG_CNTL)
+.print "DBG_CNT = $"+toHexString(DBG_CNT)
