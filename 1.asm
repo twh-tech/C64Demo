@@ -419,9 +419,8 @@ PHASE3_LOOP:
         nop
         nop
         nop
-        nop
-        nop
-        nop
+		clc
+        bcc *+2
         nop
         nop
         nop
@@ -451,7 +450,7 @@ OFFSCREEN_WORK:
         sta     PHASE3_JMP+2
 
 		// SID Player
-        //jsr     $180c
+        jsr     $180c
         
         // Scroll text
         jsr     DOSCROLL
@@ -476,7 +475,7 @@ OFFSCREEN_WORK_SKIP:
         sta     VICRASTER
 
 		// SID Player
-        //jsr     $180c
+        jsr     $180c
 
         // Scroll text        
         jsr     DOSCROLL
@@ -622,16 +621,6 @@ COPYLEFT:
         // fetch previous chars for both lines, copy to screen RAM
         // -------------------------------------------------------
 COARSERIGHT:
-        lda     SCROLLSIGN
-        cmp     #1
-        bne     COARSERIGHT_NODEBUG
-        lda     SCROLLCNTL
-        sta     DBG_CNTL
-        lda     SCROLLBUFPTR
-        sta     DBG_BUFPTR
-        lda     SCROLLCNT
-        sta     DBG_CNT
-COARSERIGHT_NODEBUG:
         dec     SCROLLBUFPTR
 
         // New character position = SCROLLBUFPTR
@@ -757,53 +746,29 @@ ALIGNFORLEFT_STORE:
         sta     SCROLLCNTL2
         rts
 
-        // -------------------------------------------------------
-        // ALIGNFORRIGHT: called on right->left direction change.
-        // -------------------------------------------------------
-        // ALIGNFORRIGHT: called on right->left direction change.
-        //
-        // SCROLLCNT is not maintained during right-scroll so it is
-        // stale. Resync: SCROLLCNT = SCROLLCNTL + 40 (with $ff wrap)
-        // then walk forward to sit on the last column of a character
-        // so the next COARSELEFT inx lands on a clean boundary.
-        // -------------------------------------------------------
 ALIGNFORRIGHT:
+        lda     SCROLLCNTL
+        sta     DBG_CNTL
+        lda     SCROLLBUFPTR
+        sta     DBG_BUFPTR
+        lda     SCROLLCNT
+        sta     DBG_CNT
+
+        // Resync SCROLLCNT = SCROLLCNTL + 40, with wrap
         lda     SCROLLCNTL
         clc
         adc     #40
-        tax                         // X = candidate position
-ALIGNRIGHT_WRAPCHECK:
-        lda     SCROLLTEXT,x
-        cmp     #$ff
-        bne     ALIGNRIGHT_NOWRAP
-        lda     #0
-        sta     SCROLLCNT
-ALIGNRIGHT_FINDWRAP:
-        inx
-        lda     SCROLLTEXT,x
-        cmp     #$ff
-        beq     ALIGNRIGHT_WRAPPED
-        inc     SCROLLCNT
-        bne     ALIGNRIGHT_FINDWRAP
-ALIGNRIGHT_WRAPPED:
-        lda     SCROLLCNT
         tax
-        jmp     ALIGNRIGHT_SYNCED
-ALIGNRIGHT_NOWRAP:
+        cpx     #<TEXTLENGTH
+        bcc     ALIGNFORRIGHT_STORE  // result < TEXTLENGTH, no wrap needed
+        // Wrap — subtract TEXTLENGTH
+        txa
+        sec
+        sbc     #<TEXTLENGTH
+        tax
+ALIGNFORRIGHT_STORE:
         stx     SCROLLCNT
-ALIGNRIGHT_SYNCED:
-        lda     SCROLLCNT
-        sta     SCROLLCNT2
-
-ALIGNFORRIGHT_LOOP:
-        ldx     SCROLLCNT
-        inx
-        lda     SCROLLBND,x
-        beq     ALIGNFORRIGHT_DONE
-        inc     SCROLLCNT
-        inc     SCROLLCNT2
-        jmp     ALIGNFORRIGHT_LOOP
-ALIGNFORRIGHT_DONE:
+        stx     SCROLLCNT2
         rts
 
 SCROLLSPEED:
