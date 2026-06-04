@@ -33,6 +33,9 @@
 .label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
 
 START:
+		lda     #$35
+        sta     $01             // RAM under BASIC+KERNAL, I/O still visible
+        
         sei
 
         // Clear pending VIC IRQ flags
@@ -51,11 +54,19 @@ START:
         sta     $dc0d
         lda     $dc0d
 
-        // Hook $0314
-        lda     #<IRQ1
-        sta     IRQVEC
+		lda     #$7f
+        sta     $dd0d       // disable all CIA2 NMI sources
+        lda     $dd0d       // acknowledge any pending NMI
+
+		lda     #<IRQ1
+        sta     $fffe
         lda     #>IRQ1
-        sta     IRQVEC+1
+        sta     $ffff
+
+        lda     #<DUMMY_NMI
+        sta     $fffa
+        lda     #>DUMMY_NMI
+        sta     $fffb
 
         // Enable VIC raster IRQ
         lda     #$01
@@ -73,7 +84,7 @@ START:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        // Copy initial buffer contents to screen RAM
+        // Fill scroll screen rows with spaces
         lda     #$20
         ldx     #39
 COPYINIT:
@@ -96,12 +107,20 @@ COPYINIT:
         sta     SCROLLCNTL2
         sta     SCROLLCNTL_RDY
         sta     SCROLLBUFPTR
-        sta     SCROLLSIGN
+        sta     SCROLLSIGN          // start scrolling left
         lda     #7
         sta     SCROLLX
 
         // Clear screen
-        jsr     $E544
+		lda     #$20
+        ldx     #$00
+CLEARSCREEN:
+        sta     $0400,x
+        sta     $0500,x
+        sta     $0600,x
+        sta     $06e8,x
+        inx
+        bne     CLEARSCREEN
 
         // Set all color RAM to black
         lda     #$00
@@ -114,9 +133,26 @@ COLORLOOP:
         inx
         bne     COLORLOOP
 
+		lda     #$0c            // medium gray
+        ldx     #39
+COLORTOPSCROLLLINE:
+        sta     $d9e0,x
+        dex
+        bpl     COLORTOPSCROLLLINE
+
+        lda     #$0b            // dark gray
+        ldx     #39
+COLORBOTTOMSCROLLLINE:
+        sta     $da08,x
+        dex
+        bpl     COLORBOTTOMSCROLLLINE
+
+
         // Point VIC to charset at $2800
         lda     #%00011010
         sta     VICMEMCTRL
+
+
 
         cli
 MAINLOOP:
@@ -131,12 +167,24 @@ IRQ1:
 IS_RASTER:
         lda     #$01
         sta     VICIRQFLAG
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        
 
 IRQHANDLER:
         jmp     PHASE1_ACTIVE
 
         // -------------------------------------------------------
-        // PHASE1 active: top border raster lines
+        // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
         ldx     #$00
@@ -144,7 +192,12 @@ PHASE1_ACTIVE:
 PHASE1_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
-        sta     VICBGCOLOR
+
+		nop
+		nop
+		nop
+     //   sta     VICBGCOLOR
+
         nop
         nop
         nop
@@ -401,10 +454,16 @@ PHASE2_DONE:
 PHASE3_JMP:
         jmp     PHASE3_LOOP
 
+        // -------------------------------------------------------
+        // PHASE3: raster bars for main display area
+        // -------------------------------------------------------
 PHASE3_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
-        sta     VICBGCOLOR
+        
+        nop
+        nop
+        //sta     VICBGCOLOR
         nop
         nop
         nop
@@ -419,19 +478,25 @@ PHASE3_LOOP:
         nop
         nop
         nop
-		clc
-        bcc *+2
+        nop
+        nop
+        nop
+//        clc
+//        bcc     *+2
         nop
         nop
         nop
         nop
-        nop                             // 22 NOPs = 44
+        nop                             // 22 cycles = 44
         inx
         cpx     #TABLESIZE
         bne     PHASE3_LOOP
 
         // -------------------------------------------------------
-        // OFFSCREEN_WORK: Phase3 active, Phase4+Phase1 time available
+        // OFFSCREEN_WORK: runs when Phase3 is active.
+        // Sets up next IRQ, plays SID, runs scroll and speed update.
+        // DOSCROLL runs before UPDATESPEED so that any direction-
+        // change pointer correction takes effect on the next frame.
         // -------------------------------------------------------
 OFFSCREEN_WORK:
         lda     #$00
@@ -449,22 +514,15 @@ OFFSCREEN_WORK:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-		// SID Player
-        jsr     $180c
-        
-        // Scroll text
+        jsr     $180c               // SID player
         jsr     DOSCROLL
         jsr     UPDATESPEED
 
-        pla
-        tay
-        pla
-        tax
-        pla
         rti
 
         // -------------------------------------------------------
-        // OFFSCREEN_WORK_SKIP: Phase3 skipped, Phase3+Phase4 time available
+        // OFFSCREEN_WORK_SKIP: runs when Phase3 is skipped.
+        // More time available; same work as OFFSCREEN_WORK.
         // -------------------------------------------------------
 OFFSCREEN_WORK_SKIP:
         lda     #$00
@@ -474,22 +532,23 @@ OFFSCREEN_WORK_SKIP:
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
-		// SID Player
-        jsr     $180c
-
-        // Scroll text        
+        jsr     $180c               // SID player
         jsr     DOSCROLL
         jsr     UPDATESPEED
 
-        pla
-        tay
-        pla
-        tax
-        pla
         rti
 
         // -------------------------------------------------------
-        // DOSCROLL: update fine scroll, coarse scroll if needed
+        // DOSCROLL: update fine scroll register; trigger coarse
+        // scroll step when fine scroll wraps in either direction.
+        //
+        // SCROLLSPEED is signed: positive = scroll left,
+        // negative (e.g. $ff = -1) = scroll right.
+        // SCROLLX holds the current fine scroll value (0-7).
+        // Subtracting a negative speed adds to SCROLLX (right).
+        // Subtracting a positive speed decreases SCROLLX (left).
+        // A coarse left step is needed when SCROLLX goes below 0.
+        // A coarse right step is needed when SCROLLX reaches 8.
         // -------------------------------------------------------
 DOSCROLL:
         lda     SCROLLX
@@ -522,25 +581,34 @@ WRITESCROLL:
         rts
 
         // -------------------------------------------------------
-        // COARSELEFT: advance circular buffer pointer,
-        // fetch next chars for both lines, copy to screen RAM
+        // COARSELEFT: called when the fine scroll wraps left.
+        // Advances the circular buffer pointer, feeds the next
+        // column from SCROLLTEXT/SCROLLTEXT2 into the rightmost
+        // buffer slot, and advances the left-edge pointer
+        // SCROLLCNTL once the buffer is full (after 41 steps).
+        //
+        // Pointer layout:
+        //   SCROLLCNT  = next text position to feed into right edge
+        //   SCROLLCNTL = text position of current leftmost column
+        //   SCROLLBUFPTR = circular buffer index of leftmost column
+        //   Right edge slot = (SCROLLBUFPTR + 39) mod 256
         // -------------------------------------------------------
 COARSELEFT:
         inc     SCROLLBUFPTR
 
-        // New character position = (SCROLLBUFPTR + 39) mod 256
+        // Right edge slot = (SCROLLBUFPTR + 39) mod 256
         lda     SCROLLBUFPTR
         clc
         adc     #39
-        tay                         // Y = position for new character
+        tay
 
-        // Fetch next character for line 1
+        // Feed next column into right edge slot for row 1
         ldx     SCROLLCNT
         lda     SCROLLTEXT,x
         cmp     #$ff
         bne     GOTLEFT1
-        ldx     #0                  // wrap to start
-        lda     SCROLLTEXT,x        // read position 0
+        ldx     #0                  // wrap: read position 0
+        lda     SCROLLTEXT,x
         ldx     #1                  // next call starts at position 1
         stx     SCROLLCNT
         jmp     STORELEFT1
@@ -550,13 +618,13 @@ GOTLEFT1:
 STORELEFT1:
         sta     SCROLLBUF,y
 
-        // Fetch next character for line 2
+        // Feed next column into right edge slot for row 2
         ldx     SCROLLCNT2
         lda     SCROLLTEXT2,x
         cmp     #$ff
         bne     GOTLEFT2
-        ldx     #0                  // wrap to start
-        lda     SCROLLTEXT2,x       // read position 0
+        ldx     #0                  // wrap: read position 0
+        lda     SCROLLTEXT2,x
         ldx     #1                  // next call starts at position 1
         stx     SCROLLCNT2
         jmp     STORELEFT2
@@ -566,15 +634,16 @@ GOTLEFT2:
 STORELEFT2:
         sta     SCROLLBUF2,y
 
-        // Advance left-edge counters, but only once SCROLLCNT has
-        // reached 41 — so SCROLLCNTL stays exactly 40 steps behind.
+        // Advance left-edge pointer SCROLLCNTL once the buffer is
+        // full. SCROLLCNTL starts at 0 and SCROLLCNT starts at 0;
+        // after 41 coarse steps SCROLLCNT reaches 41 and SCROLLCNTL
+        // begins advancing, keeping it exactly 40 steps behind.
         lda     SCROLLCNTL_RDY
         bne     ADVANCELEFT
 
-        // Not ready yet — check if SCROLLCNT has reached 41
         lda     SCROLLCNT
         cmp     #41
-        bcc     SKIPCNTL        // SCROLLCNT < 41, don't advance yet
+        bcc     SKIPCNTL
         lda     #1
         sta     SCROLLCNTL_RDY
 
@@ -583,8 +652,8 @@ ADVANCELEFT:
         lda     SCROLLTEXT,x
         cmp     #$ff
         bne     ADVANCELEFT1
-        ldx     #0                  // wrap to start
-        stx     SCROLLCNTL          // store 0, next call will advance to 1
+        ldx     #0                  // wrap: next call reads position 0
+        stx     SCROLLCNTL
         jmp     ADVANCELEFT2
 ADVANCELEFT1:
         inx
@@ -594,15 +663,15 @@ ADVANCELEFT2:
         lda     SCROLLTEXT2,x
         cmp     #$ff
         bne     ADVANCELEFT3
-        ldx     #0                  // wrap to start
-        stx     SCROLLCNTL2         // store 0, next call will advance to 1
+        ldx     #0                  // wrap: next call reads position 0
+        stx     SCROLLCNTL2
         jmp     SKIPCNTL
 ADVANCELEFT3:
         inx
         stx     SCROLLCNTL2
 
 SKIPCNTL:
-        // Copy both buffers to screen RAM
+        // Copy circular buffer to screen RAM (40 columns)
         ldx     SCROLLBUFPTR
         ldy     #0
 COPYLEFT:
@@ -617,22 +686,27 @@ COPYLEFT:
         rts
 
         // -------------------------------------------------------
-        // COARSERIGHT: decrement circular buffer pointer,
-        // fetch previous chars for both lines, copy to screen RAM
+        // COARSERIGHT: called when the fine scroll wraps right.
+        // Decrements the circular buffer pointer and feeds the
+        // previous column from SCROLLTEXT/SCROLLTEXT2 into the
+        // new leftmost buffer slot using SCROLLCNTL.
+        //
+        // SCROLLCNTL is decremented by one on each call, walking
+        // backwards through the text one column at a time.
+        // Wraps to the last byte of the text on underflow.
         // -------------------------------------------------------
 COARSERIGHT:
         dec     SCROLLBUFPTR
 
-        // New character position = SCROLLBUFPTR
         lda     SCROLLBUFPTR
-        tay                         // Y = position for new character
+        tay                         // Y = new leftmost slot
 
-        // Fetch previous character for line 1 using left-edge counter
+        // Feed previous column into leftmost slot for row 1
         ldx     SCROLLCNTL
         dex
         cpx     #$ff
         bne     GOTRIGHT1
-        // Underflow — wrap to last character in text
+        // Underflow: wrap to last valid text position
         ldx     #0
 FINDEND1:
         lda     SCROLLTEXT,x
@@ -649,12 +723,12 @@ GOTRIGHT1:
         lda     SCROLLTEXT,x
         sta     SCROLLBUF,y
 
-        // Fetch previous character for line 2 using left-edge counter
+        // Feed previous column into leftmost slot for row 2
         ldx     SCROLLCNTL2
         dex
         cpx     #$ff
         bne     GOTRIGHT2
-        // Underflow — wrap to last character in text
+        // Underflow: wrap to last valid text position
         ldx     #0
 FINDEND2:
         lda     SCROLLTEXT2,x
@@ -671,7 +745,7 @@ GOTRIGHT2:
         lda     SCROLLTEXT2,x
         sta     SCROLLBUF2,y
 
-        // Copy both buffers to screen RAM
+        // Copy circular buffer to screen RAM (40 columns)
         ldx     SCROLLBUFPTR
         ldy     #0
 COPYRIGHT:
@@ -686,8 +760,16 @@ COPYRIGHT:
         rts
 
         // -------------------------------------------------------
-        // UPDATESPEED: advance speed table every 6 frames,
-        // detect direction changes and realign char boundaries
+        // UPDATESPEED: advance the speed table every 6 frames.
+        // Detects direction changes and resyncs scroll pointers.
+        //
+        // SCROLLSIGN tracks current direction:
+        //   0 = scrolling left  (SCROLLSPEED positive or zero)
+        //   1 = scrolling right (SCROLLSPEED negative)
+        //
+        // On direction change, either SCROLLCNTL (left->right) or
+        // SCROLLCNT (right->left) has become stale and is resynced
+        // from the pointer that was actively maintained.
         // -------------------------------------------------------
 UPDATESPEED:
         inc     SPEEDDELAY
@@ -706,26 +788,23 @@ UPDATESPEED:
 SAVEIDX:
         stx     SPEEDIDX
 
-        // --- Direction change detection ---
-        // SCROLLSIGN: 0 = was going left (positive speed)
-        //             1 = was going right (negative speed)
         lda     SCROLLSPEED
         bmi     SPEED_IS_NEG
 
-        // Speed is zero or positive (scrolling left)
+        // Speed zero or positive: scrolling left
         lda     SCROLLSIGN
         beq     SPEEDDONE           // already going left, no change
-        // Transition: right -> left
+        // Transition right->left: resync SCROLLCNT from SCROLLCNTL
         lda     #0
         sta     SCROLLSIGN
         jsr     ALIGNFORRIGHT
         jmp     SPEEDDONE
 
 SPEED_IS_NEG:
-        // Speed is negative (scrolling right)
+        // Speed negative: scrolling right
         lda     SCROLLSIGN
         bne     SPEEDDONE           // already going right, no change
-        // Transition: left -> right
+        // Transition left->right: resync SCROLLCNTL from SCROLLCNT
         lda     #1
         sta     SCROLLSIGN
         jsr     ALIGNFORLEFT
@@ -733,60 +812,74 @@ SPEED_IS_NEG:
 SPEEDDONE:
         rts
 
+        // -------------------------------------------------------
+        // ALIGNFORLEFT: called on left->right direction change.
+        //
+        // During left-scroll, SCROLLCNT is authoritative (actively
+        // maintained by COARSELEFT). SCROLLCNTL has drifted.
+        // Resync: SCROLLCNTL = SCROLLCNT - 40 (mod TEXTLENGTH).
+        // COARSERIGHT uses dex before writing, so with SCROLLCNTL
+        // set to SCROLLCNT-40 its first dex lands on the correct
+        // column to feed into the new leftmost slot.
+        // -------------------------------------------------------
 ALIGNFORLEFT:
         lda     SCROLLCNT
         sec
         sbc     #40
         bcs     ALIGNFORLEFT_STORE
-        // Underflow — add text length to wrap correctly
         clc
-        adc     #<TEXTLENGTH
+        adc     #<TEXTLENGTH        // wrap: add text length
 ALIGNFORLEFT_STORE:
         sta     SCROLLCNTL
         sta     SCROLLCNTL2
         rts
 
+        // -------------------------------------------------------
+        // ALIGNFORRIGHT: called on right->left direction change.
+        //
+        // During right-scroll, SCROLLCNTL is authoritative
+        // (actively maintained by COARSERIGHT). SCROLLCNT has
+        // drifted. Resync: SCROLLCNT = SCROLLCNTL + 40
+        // (mod TEXTLENGTH). COARSELEFT uses inx before writing,
+        // so with SCROLLCNT set to SCROLLCNTL+40 its first inx
+        // lands on the correct column to feed into the new
+        // rightmost slot.
+        // -------------------------------------------------------
 ALIGNFORRIGHT:
-        lda     SCROLLCNTL
-        sta     DBG_CNTL
-        lda     SCROLLBUFPTR
-        sta     DBG_BUFPTR
-        lda     SCROLLCNT
-        sta     DBG_CNT
-
-        // Resync SCROLLCNT = SCROLLCNTL + 40, with wrap
         lda     SCROLLCNTL
         clc
         adc     #40
         tax
         cpx     #<TEXTLENGTH
-        bcc     ALIGNFORRIGHT_STORE  // result < TEXTLENGTH, no wrap needed
-        // Wrap — subtract TEXTLENGTH
+        bcc     ALIGNFORRIGHT_STORE // result < TEXTLENGTH, no wrap needed
         txa
         sec
-        sbc     #<TEXTLENGTH
+        sbc     #<TEXTLENGTH        // wrap: subtract text length
         tax
 ALIGNFORRIGHT_STORE:
         stx     SCROLLCNT
         stx     SCROLLCNT2
         rts
 
+DUMMY_NMI:
+        rti
+
 SCROLLSPEED:
         .byte 1
 SCROLLX:
         .byte 7
 SCROLLCNT:
-        .byte 0
+        .byte 0                     // right-edge text pointer (left-scroll)
 SCROLLCNT2:
-        .byte 0
+        .byte 0                     // right-edge text pointer, row 2
 SCROLLCNTL:
-        .byte 0
+        .byte 0                     // left-edge text pointer (right-scroll)
 SCROLLCNTL2:
-        .byte 0
+        .byte 0                     // left-edge text pointer, row 2
 SCROLLCNTL_RDY:
-        .byte 0
+        .byte 0                     // 1 once buffer is full and SCROLLCNTL active
 SCROLLBUFPTR:
-        .byte 0
+        .byte 0                     // circular buffer index of leftmost column
 SCROLLSIGN:
         .byte 0                     // 0=left, 1=right
 SPEEDIDX:
@@ -804,7 +897,7 @@ DBG_CNT:
 SCROLLTEXT:
         .import binary "scroll_top.bin"
         .byte $ff
-.label TEXTLENGTH = * - SCROLLTEXT - 1   // length excluding $ff sentinel
+.label TEXTLENGTH = * - SCROLLTEXT - 1  // text length excluding $ff sentinel
 
 .align 256
 SCROLLTEXT2:
@@ -816,7 +909,6 @@ SCROLLBND:
         .import binary "scroll_bnd.bin"
         .byte $ff
 
-
 SPEEDTABLE:
         // Ramp up left
         .byte 1,1,1,2,2,2,3,3,3,4,4,4,5,5,5
@@ -824,9 +916,9 @@ SPEEDTABLE:
         .fill 30, 5
         // Ramp down to zero
         .byte 4,4,4,3,3,3,2,2,2,1,1,1,0,0,0
-        // Ramp into reverse
+        // Ramp into reverse (right)
         .byte $ff,$ff,$ff,$fe,$fe,$fe,$fd,$fd,$fd,$fc,$fc,$fc,$fb,$fb,$fb
-        // Hold at reverse speed
+        // Hold at max right speed
         .fill 10, $fb
         // Ramp back to zero
         .byte $fc,$fc,$fc,$fd,$fd,$fd,$fe,$fe,$fe,$ff,$ff,$ff,0,0,0
@@ -871,6 +963,7 @@ SCROLLBUF2:
 .fill charset.getSize(), charset.get(i)
 
 .print "SCROLLTEXT = $"+toHexString(SCROLLTEXT)
+.print "TEXTLENGTH = "+TEXTLENGTH
 .print "COARSERIGHT = $"+toHexString(COARSERIGHT)
 .print "SCROLLCNT = $"+toHexString(SCROLLCNT)
 .print "SCROLLCNTL = $"+toHexString(SCROLLCNTL)
