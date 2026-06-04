@@ -35,6 +35,50 @@
 START:
 		lda     #$35
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
+
+		// Sprite test - can be removed later
+		// Create a solid sprite at $3800
+        // In VIC bank 0, sprite pointer value = $3800/64 = $e0
+        lda     #$ff
+        ldx     #0
+MAKESOLID:
+        sta     $3800,x
+        inx
+        cpx     #63             // 63 bytes (21 rows x 3 bytes)
+        bne     MAKESOLID
+        lda     #$00
+        sta     $3840           // padding byte
+
+        // Point sprite 0 and sprite 1 to $3800 (pointer = $e0)
+        lda     #$e0
+        sta     $07f8           // sprite 0 pointer
+        sta     $07f9           // sprite 1 pointer
+
+        // Sprite colors: light blue = $0e
+        lda     #$0e
+        sta     $d027           // sprite 0 color
+        sta     $d028           // sprite 1 color
+
+        // Sprite 0: top border, half in border half in display area
+        // Display starts at raster 51, sprite is 21 pixels tall
+        // so Y=40 puts it straddling the border/display boundary
+        lda     #160
+        sta     $d000           // X center
+        lda     #40
+        sta     $d001           // Y straddles top border/display
+
+        // Sprite 1: bottom border, half in display half in border
+        // Display ends at raster 250, bottom border starts at 251
+        // Y=241 puts it straddling the display/bottom border boundary
+        lda     #160
+        sta     $d002           // X center
+        lda     #241
+        sta     $d003           // Y straddles display/bottom border
+
+        // Enable sprites 0 and 1
+        //lda     #%00000011
+        //sta     $d015
+		// end of sprite test code
         
         sei
 
@@ -151,8 +195,6 @@ COLORBOTTOMSCROLLLINE:
         // Point VIC to charset at $2800
         lda     #%00011010
         sta     VICMEMCTRL
-
-
 
         cli
 MAINLOOP:
@@ -502,6 +544,10 @@ OFFSCREEN_WORK:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
+        
+        // switch to 24-row mode - opens borders
+        lda     #$13
+        sta     VICICR
 
         lda     #PHASE2_RASTER
         sta     VICRASTER
@@ -518,6 +564,10 @@ OFFSCREEN_WORK:
         jsr     DOSCROLL
         jsr     UPDATESPEED
 
+		// restore 25-row mode - re-arms trick
+		lda     #$1b
+        sta     VICICR
+
         rti
 
         // -------------------------------------------------------
@@ -529,12 +579,20 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBORDER
         sta     VICBGCOLOR
 
+        // switch to 24-row mode - opens borders
+        lda     #$13
+        sta     VICICR
+
         lda     #PHASE1_RASTER
         sta     VICRASTER
 
         jsr     $180c               // SID player
         jsr     DOSCROLL
         jsr     UPDATESPEED
+
+		// restore 25-row mode - re-arms trick
+		lda     #$1b
+        sta     VICICR
 
         rti
 
