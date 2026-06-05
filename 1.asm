@@ -38,7 +38,7 @@ START:
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
 
         // set garbage byte to visible value for open border testing
-        lda     #$7f
+        lda     #$00
         sta     garbagebyte
 
         sei
@@ -393,6 +393,8 @@ PHASE2_N6:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
+        cpy     #1                      // 2 cycles - check if last iteration
+        beq     PHASE2_LAST             // 3 cycles taken / 2 cycles not taken
         nop
         nop
         nop
@@ -413,11 +415,10 @@ PHASE2_N6:
         nop
         nop
         nop
-        nop
-        nop
-        nop                             // 23 NOPs = 46
+        nop                             // 21 NOPs = 42 cycles
         inx
         bne     PHASE2_N7
+
 
 PHASE2_N7:
         lda     COLORTABLE,x
@@ -444,19 +445,13 @@ PHASE2_N7:
         nop                             // 19 NOPs = 38
         inx
         dey
-        beq     PHASE2_LAST             // last iteration goes to unrolled block
+        beq     PHASE2_N7_DONE
         jmp     PHASE2_GROUP
+PHASE2_N7_DONE:
+        nop
+        jmp     PHASE3_JMP
 
-        // -------------------------------------------------------
-        // PHASE2_LAST: unrolled last raster line of PHASE2.
-        // Writes #$13 to VICICR to open the bottom border.
-        // -------------------------------------------------------
 PHASE2_LAST:
-        lda     COLORTABLE,x            // 4 cycles
-        sta     VICBORDER               // 4 cycles
-        sta     VICBGCOLOR              // 4 cycles
-        lda     #$13                    // 2 cycles - open border
-        sta     VICICR                  // 4 cycles
         nop
         nop
         nop
@@ -469,9 +464,42 @@ PHASE2_LAST:
         nop
         nop
         nop
-        nop                             // 13 NOPs = 26 cycles
-        inx                             // 2 cycles
-        nop                             // 2 cycles padding
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop                             // adjust NOPs to fill penultimate line
+        inx                             // crosses into last raster line
+        lda     COLORTABLE,x
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        lda     #$13
+        sta     VICICR
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop                             // adjust NOPs to fill last line
+        inx
 PHASE3_JMP:
         jmp     PHASE3_LOOP
 
@@ -481,8 +509,7 @@ PHASE3_JMP:
 PHASE3_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
-        nop
-        nop
+        sta		VICBGCOLOR
         nop
         nop
         nop
@@ -533,7 +560,7 @@ OFFSCREEN_WORK:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        jsr     $180c               // SID player
+        //jsr     $180c               // SID player
         jsr     DOSCROLL
         jsr     UPDATESPEED
 
