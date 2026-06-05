@@ -473,7 +473,6 @@ PHASE2_LAST:
         nop
         nop
         nop
-        nop
         nop                             // adjust NOPs to fill penultimate line
         inx                             // crosses into last raster line
         lda     COLORTABLE,x
