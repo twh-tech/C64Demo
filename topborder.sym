@@ -1,10 +1,11 @@
-.label nearend=$839
 .label ci2icr=$dd0d
-.label delay=$83e
 .label irqmsk=$d01a
+.label loop=$83c
 .label raster=$d012
 .label ciaicr=$dc0d
+.label irq1=$83f
 .label garbage=$3fff
 .label vicirq=$d019
 .label lab2064=$810
+.label irq2=$866
 .label scroly=$d011

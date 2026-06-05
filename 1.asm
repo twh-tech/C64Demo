@@ -7,7 +7,6 @@
         .byte   $00,$00,$00
         *=$0810
 
-.label IRQVEC          = $0314
 .label VICICR          = $d011
 .label VICRASTER       = $d012
 .label VICXSCROLL      = $d016
@@ -76,7 +75,7 @@ MAKESOLID:
         sta     $d003           // Y straddles display/bottom border
 
         // Enable sprites 0 and 1
-        //lda     #%00000011
+        lda     #%00000011
         //sta     $d015
 		// end of sprite test code
         
@@ -493,6 +492,7 @@ PHASE2_N7:
 
 PHASE2_DONE:
         nop
+
 PHASE3_JMP:
         jmp     PHASE3_LOOP
 
@@ -503,8 +503,12 @@ PHASE3_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
         
+
         nop
         nop
+        
+        
+        
         //sta     VICBGCOLOR
         nop
         nop
@@ -546,8 +550,8 @@ OFFSCREEN_WORK:
         sta     VICBGCOLOR
         
         // switch to 24-row mode - opens borders
-        lda     #$13
-        sta     VICICR
+        //lda     #$13
+        //sta     VICICR
 
         lda     #PHASE2_RASTER
         sta     VICRASTER
@@ -580,8 +584,8 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBGCOLOR
 
         // switch to 24-row mode - opens borders
-        lda     #$13
-        sta     VICICR
+        //lda     #$13
+        //sta     VICICR
 
         lda     #PHASE1_RASTER
         sta     VICRASTER
