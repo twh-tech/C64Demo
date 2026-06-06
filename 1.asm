@@ -42,6 +42,7 @@ START:
         sta     garbagebyte
 
         sei
+        //jsr     SETUPSPRITE
 
         // Clear pending VIC IRQ flags
         lda     #$ff
@@ -452,11 +453,8 @@ PHASE2_N7_DONE:
         jmp     PHASE3_JMP
 
 PHASE2_LAST:
-        nop
-        nop
-        nop
-        nop
-        nop
+        lda     #$13
+        sta     VICICR
         nop
         nop
         nop
@@ -478,8 +476,13 @@ PHASE2_LAST:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        lda     #$13
-        sta     VICICR
+        nop
+        nop
+        nop
+        nop
+        nop
+//        lda     #$13
+//        sta     VICICR
         nop
         nop
         nop
@@ -562,6 +565,7 @@ OFFSCREEN_WORK:
         //jsr     $180c               // SID player
         jsr     DOSCROLL
         jsr     UPDATESPEED
+        //inc     $d001
 
         // restore 25-row mode - re-arms open border trick for next frame
         lda     #$1b
@@ -956,3 +960,41 @@ SCROLLBUF2:
 .print "SCROLLSIGN = $"+toHexString(SCROLLSIGN)
 .print "DBG_CNTL = $"+toHexString(DBG_CNTL)
 .print "DBG_CNT = $"+toHexString(DBG_CNT)
+
+SETUPSPRITE:
+        // Create a solid sprite at $3800
+        // In VIC bank 0, sprite pointer value = $3800/64 = $e0
+        lda     #$ff
+        ldx     #0
+MAKESOLID:
+        sta     $3800,x
+        inx
+        cpx     #63
+        bne     MAKESOLID
+        lda     #$00
+        sta     $3840
+
+        // Point sprite 0 to $3800
+        lda     #$e0
+        sta     $07f8
+
+        // Sprite color: light blue = $0e
+        lda     #$0e
+        sta     $d027
+
+        // X position: horizontal middle = 160
+        lda     #160
+        sta     $d000
+
+        // Y position: straddling display/bottom border
+        // Display ends around raster 250, sprite is 21 pixels tall
+        // Y=241 puts it half in display half in border
+        lda     #251
+        //lda		#255
+        sta     $d001
+
+        // Enable sprite 0
+        lda     #%00000001
+        sta     $d015
+
+        rts

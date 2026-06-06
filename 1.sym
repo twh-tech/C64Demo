@@ -18,6 +18,7 @@
 .label PHASE2_ENTRY=$925
 .label PHASE2_N7_DONE=$a2e
 .label SPEED_IS_NEG=$c43
+.label SETUPSPRITE=$2c80
 .label TABLESIZE=$111
 .label SCROLLROW=$c
 .label GOTRIGHT2=$beb
@@ -100,6 +101,7 @@
 .label MAINLOOP=$8e1
 .label SCROLLRAM=$5e0
 .label DISPON_LEN=$c8
+.label MAKESOLID=$2c84
 .label START=$810
 .label garbagebyte=$3fff
 .label SCROLLSPEED=$c7a
