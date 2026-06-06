@@ -563,6 +563,7 @@ OFFSCREEN_WORK:
         sta     PHASE3_JMP+2
 
         //jsr     $180c               // SID player
+        jsr		DORASTERBARS
         jsr     DOSCROLL
         jsr     UPDATESPEED
         //inc     $d001
@@ -996,5 +997,215 @@ MAKESOLID:
         // Enable sprite 0
         lda     #%00000001
         sta     $d015
+
+        rts
+
+
+// -------------------------------------------------------
+// Labels used by bar system
+// -------------------------------------------------------
+
+.label BAR_COUNT        = 3
+.label BAR_HEIGHT       = 7        // changed from 7 to 5, no black edges
+.label RASTERBAR_TOP    = 50
+.label RASTERBAR_BOT    = 285
+.label VISIBLE_RANGE    = RASTERBAR_BOT - RASTERBAR_TOP - BAR_HEIGHT
+.label BARTABLE_OFFSET  = RASTERBAR_TOP - TABLESTART   // = 35
+.label BAR_PHASE_STEP   = 10
+
+// -------------------------------------------------------
+// Zero page locations used by bar system
+// -------------------------------------------------------
+.label ZP_BARPTR    = $fb       // 2 bytes: pointer into COLORTABLE for current bar
+.label ZP_BARCOL    = $fd       // 1 byte: scratch
+.label ZP_BARX      = $fe       // 1 byte: bar loop counter
+
+// -------------------------------------------------------
+// BAR DATA TABLES
+// -------------------------------------------------------
+
+// Current Y position of each bar — index into COLORTABLE
+// (relative to start of COLORTABLE, so 0 = raster line TABLESTART)
+// Valid range: BARTABLE_OFFSET .. BARTABLE_OFFSET + VISIBLE_RANGE
+BAR_YPOS:
+        .byte BARTABLE_OFFSET + 20   // bar 0 initial pos
+        .byte BARTABLE_OFFSET + 20   // bar 1
+        .byte BARTABLE_OFFSET + 20   // bar 2
+        .byte BARTABLE_OFFSET + 20   // bar 3
+        .byte BARTABLE_OFFSET + 20   // bar 4
+
+// Sine table phase for each bar
+BAR_PHASE:
+        .byte 0                      // bar 0 — leading bar
+        .byte 256 - BAR_PHASE_STEP*1 // bar 1 trails by 1 step
+        .byte 256 - BAR_PHASE_STEP*2 // bar 2 trails by 2 steps
+        .byte 256 - BAR_PHASE_STEP*3 // bar 3
+        .byte 256 - BAR_PHASE_STEP*4 // bar 4
+
+// Which color pattern each bar uses (index into BAR_COLOR_LO/HI)
+BAR_TYPE:
+        .byte 0    // red
+        .byte 1    // blue
+        .byte 2    // gray
+//        .byte 3    // green
+//        .byte 4    // yellow
+
+// -------------------------------------------------------
+// BAR COLOR PATTERNS
+// 5 pattern types, each BAR_HEIGHT (5) bytes, top to bottom
+// -------------------------------------------------------
+BAR_COLORS_0:  .byte $02,$02,$0a,$0f,$0a,$02,$02   // red:    red, red, light red, white, light red, red, red
+BAR_COLORS_1:  .byte $06,$06,$04,$0f,$04,$06,$06   // blue:   blue, blue, purple, white, purple, blue, blue
+BAR_COLORS_2:  .byte $0b,$0b,$0c,$0f,$0c,$0b,$0b   // gray:   dark gray, dark gray, medium gray, white, medium gray, dark gray, dark gray
+BAR_COLORS_3:  .byte $05,$05,$0d,$0f,$0d,$05,$05   // green:  green, green, light green, white, light green, green, green
+BAR_COLORS_4:  .byte $09,$09,$07,$0f,$07,$09,$09   // yellow: brown, brown, yellow, white, yellow, brown, brown
+
+// Low/high byte tables for indirect indexed access to color patterns
+BAR_COLOR_LO:
+        .byte <BAR_COLORS_0, <BAR_COLORS_1, <BAR_COLORS_2, <BAR_COLORS_3, <BAR_COLORS_4
+
+BAR_COLOR_HI:
+        .byte >BAR_COLORS_0, >BAR_COLORS_1, >BAR_COLORS_2, >BAR_COLORS_3, >BAR_COLORS_4
+
+// -------------------------------------------------------
+// SINE TABLE
+// 256 entries, range scaled to VISIBLE_RANGE
+// Values are COLORTABLE offsets: BARTABLE_OFFSET .. BARTABLE_OFFSET+VISIBLE_RANGE
+// Generate with: BARTABLE_OFFSET + (sin(i/256*2pi)+1)/2 * VISIBLE_RANGE
+//
+// VISIBLE_RANGE = 285 - 50 - 7 = 228
+// BARTABLE_OFFSET = 35
+// So values range from 35 to 35+228 = 263
+// -------------------------------------------------------
+SINETABLE:
+        // 256 bytes — generated values below
+        // sin scaled: offset + (sin+1)/2 * range
+        // These are approximated — regenerate with a script for accuracy
+		.byte 145,147,150,153,155,158,161,163,166,169,171,174,176,179,182,184
+        .byte 187,189,192,194,196,199,201,203,206,208,210,212,214,216,218,220
+        .byte 222,224,226,228,230,231,233,234,236,237,239,240,242,243,244,245
+        .byte 246,247,248,249,250,251,251,252,252,253,253,254,254,254,254,254
+        .byte 255,254,254,254,254,254,253,253,252,252,251,251,250,249,248,247
+        .byte 246,245,244,243,242,240,239,237,236,234,233,231,230,228,226,224
+        .byte 222,220,218,216,214,212,210,208,206,203,201,199,196,194,192,189
+        .byte 187,184,182,179,176,174,171,169,166,163,161,158,155,153,150,147
+        .byte 145,142,139,136,134,131,128,126,123,120,118,115,113,110,107,105
+        .byte 102,100,97,95,93,90,88,86,83,81,79,77,75,73,71,69
+        .byte 67,65,63,61,59,58,56,55,53,52,50,49,47,46,45,44
+        .byte 43,42,41,40,39,38,38,37,37,36,36,35,35,35,35,35
+        .byte 35,35,35,35,35,35,36,36,37,37,38,38,39,40,41,42
+        .byte 43,44,45,46,47,49,50,52,53,55,56,58,59,61,63,65
+        .byte 67,69,71,73,75,77,79,81,83,86,88,90,93,95,97,100
+        .byte 102,105,107,110,113,115,118,120,123,126,128,131,134,136,139,142
+
+
+
+// Sine index for leading bar (bar 0)
+SINE_IDX:
+        .byte 0
+
+// sine table steps to advance per frame (higher = faster motion)
+SINE_SPEED:
+        .byte 1
+
+// -------------------------------------------------------
+// DORASTERBARS
+// Call from offscreen work each frame.
+// -------------------------------------------------------
+DORASTERBARS:
+
+        // ---- Step 1: Erase all bars (write black to old positions) ----
+        lda     #BAR_COUNT-1
+        sta     ZP_BARX
+
+ERASE_BAR:
+        ldx     ZP_BARX
+        lda     BAR_YPOS,x          // COLORTABLE offset for top of bar
+        tay                         // Y = index into COLORTABLE
+
+        lda     #$00
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y
+        iny
+        sta     COLORTABLE,y        // 7 stores — unrolled, no inner loop
+
+        dec     ZP_BARX
+        bpl     ERASE_BAR
+
+        // ---- Step 2: Advance sine index ----
+        lda     SINE_IDX
+        clc
+        adc     SINE_SPEED
+        sta     SINE_IDX            // wraps naturally mod 256
+
+        // ---- Step 3: Update bar positions and paint ----
+        lda     #BAR_COUNT-1
+        sta     ZP_BARX
+
+UPDATE_BAR:
+        ldx     ZP_BARX
+
+        // Compute sine index for this bar: SINE_IDX + BAR_PHASE[x]
+        lda     SINE_IDX
+        clc
+        adc     BAR_PHASE,x         // wraps mod 256 — that's fine, table is 256 entries
+        tay
+        lda     SINETABLE,y         // new Y position (COLORTABLE offset)
+        sta     BAR_YPOS,x          // save for next frame's erase
+
+        // Set up ZP_BARPTR = COLORTABLE + BAR_YPOS[x]
+        // Since COLORTABLE is page-aligned (.align 256), we just need:
+        //   ZP_BARPTR lo = BAR_YPOS[x]
+        //   ZP_BARPTR hi = >COLORTABLE
+        sta     ZP_BARPTR
+        lda     #>COLORTABLE
+        sta     ZP_BARPTR+1
+
+        // Set up source pointer to color pattern for this bar type
+        lda     BAR_TYPE,x
+        tay
+        lda     BAR_COLOR_LO,y
+        sta     ZP_BARCOL           // reuse as src ptr lo — need 2 ZP bytes
+        // Actually need a second ZP pointer for source.
+        // Let's use ZP_SRCPTR = $f9/$fa
+        lda     BAR_COLOR_LO,y
+        sta     $f9
+        lda     BAR_COLOR_HI,y
+        sta     $fa
+
+        // Paint 7 bytes: (ZP_BARPTR)[0..6] = (ZP_SRCPTR)[0..6]
+        ldy     #0
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y
+        iny
+        lda     ($f9),y
+        sta     (ZP_BARPTR),y       // 7 unrolled indirect stores
+
+        dec     ZP_BARX
+        bpl     UPDATE_BAR
 
         rts
