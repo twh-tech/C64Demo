@@ -81,7 +81,9 @@ START:
         lda     #$01
         sta     VICIRQENABLE
 
-        // Phase1 skipped, Phase3 active
+		lda     PHASE_STATE
+        bne     INIT_STATE_B
+        // State A: Phase1 skipped, Phase3 active
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -92,6 +94,20 @@ START:
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
+        jmp     INIT_DONE
+INIT_STATE_B:
+        // State B: Phase1 active, Phase3 skipped
+        lda     #PHASE1_RASTER
+        sta     VICRASTER
+        lda     #<PHASE1_ACTIVE
+        sta     IRQHANDLER+1
+        lda     #>PHASE1_ACTIVE
+        sta     IRQHANDLER+2
+        lda     #<OFFSCREEN_WORK_SKIP
+        sta     PHASE3_JMP+1
+        lda     #>OFFSCREEN_WORK_SKIP
+        sta     PHASE3_JMP+2
+INIT_DONE:
 
         // Fill scroll screen rows with spaces
         lda     #$20
@@ -187,7 +203,7 @@ IS_RASTER:
         nop
         nop
         nop
-
+        nop
 IRQHANDLER:
         jmp     PHASE1_ACTIVE
 
@@ -200,14 +216,7 @@ PHASE1_ACTIVE:
 PHASE1_LOOP:
         lda     COLORTABLE,x
         sta     VICBORDER
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
+        sta     VICBGCOLOR
         nop
         nop
         nop
@@ -222,6 +231,17 @@ PHASE1_LOOP:
         nop
         nop
         nop                             // 22 NOPs = 44
+        
+        //extra
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        
+        nop
+        nop
         inx
         cpx     #DISPOFF_TOP
         bne     PHASE1_LOOP
@@ -1000,7 +1020,7 @@ SCROLLBUF2:
         .fill 256, $20
 
 PHASE_STATE:
-        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
+        .byte 1     // 0 = State A: Phase1 skipped, Phase3 active
                     // 1 = State B: Phase1 active, Phase3 skipped
 
 * = $1800
