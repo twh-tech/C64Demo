@@ -591,7 +591,7 @@ OFFSCREEN_WORK:
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
 
-        //jsr     $180c               // SID player
+        jsr     $180c               // SID player
         jsr		DORASTERBARS
         jsr     DOSCROLL
         jsr     UPDATESPEED
@@ -1034,7 +1034,7 @@ MAKESOLID:
 // Labels used by bar system
 // -------------------------------------------------------
 
-.label BAR_COUNT        = 3
+.label BAR_COUNT        = 2
 .label BAR_HEIGHT       = 7        // changed from 7 to 5, no black edges
 .label RASTERBAR_TOP    = 50
 .label RASTERBAR_BOT    = 285
@@ -1062,6 +1062,9 @@ BAR_YPOS:
         .byte BARTABLE_OFFSET + 20   // bar 2
         .byte BARTABLE_OFFSET + 20   // bar 3
         .byte BARTABLE_OFFSET + 20   // bar 4
+
+BAR_YPOS_HI:
+        .byte 0,0,0,0,0
 
 // Sine table phase for each bar
 BAR_PHASE:
@@ -1107,25 +1110,41 @@ BAR_COLOR_HI:
 // So values range from 35 to 35+228 = 263
 // -------------------------------------------------------
 SINETABLE:
-        // 256 bytes — generated values below
-        // sin scaled: offset + (sin+1)/2 * range
-        // These are approximated — regenerate with a script for accuracy
-		.byte 145,147,150,153,155,158,161,163,166,169,171,174,176,179,182,184
-        .byte 187,189,192,194,196,199,201,203,206,208,210,212,214,216,218,220
-        .byte 222,224,226,228,230,231,233,234,236,237,239,240,242,243,244,245
-        .byte 246,247,248,249,250,251,251,252,252,253,253,254,254,254,254,254
-        .byte 255,254,254,254,254,254,253,253,252,252,251,251,250,249,248,247
-        .byte 246,245,244,243,242,240,239,237,236,234,233,231,230,228,226,224
-        .byte 222,220,218,216,214,212,210,208,206,203,201,199,196,194,192,189
-        .byte 187,184,182,179,176,174,171,169,166,163,161,158,155,153,150,147
-        .byte 145,142,139,136,134,131,128,126,123,120,118,115,113,110,107,105
-        .byte 102,100,97,95,93,90,88,86,83,81,79,77,75,73,71,69
-        .byte 67,65,63,61,59,58,56,55,53,52,50,49,47,46,45,44
-        .byte 43,42,41,40,39,38,38,37,37,36,36,35,35,35,35,35
-        .byte 35,35,35,35,35,35,36,36,37,37,38,38,39,40,41,42
-        .byte 43,44,45,46,47,49,50,52,53,55,56,58,59,61,63,65
-        .byte 67,69,71,73,75,77,79,81,83,86,88,90,93,95,97,100
-        .byte 102,105,107,110,113,115,118,120,123,126,128,131,134,136,139,142
+        .byte 133,136,139,142,146,149,152,155,158,162,165,168,171,174,177,180
+        .byte 183,186,189,192,195,198,201,204,206,209,212,214,217,219,222,224
+        .byte 227,229,231,233,235,237,239,241,243,245,247,248,250,251,253,254
+        .byte 255,1,2,3,4,5,6,6,7,8,8,8,9,9,9,9
+        .byte 10,9,9,9,9,8,8,8,7,6,6,5,4,3,2,1
+        .byte 255,254,253,251,250,248,247,245,243,241,239,237,235,233,231,229
+        .byte 227,224,222,219,217,214,212,209,206,204,201,198,195,192,189,186
+        .byte 183,180,177,174,171,168,165,162,158,155,152,149,146,142,139,136
+        .byte 133,129,126,123,119,116,113,110,107,103,100,97,94,91,88,85
+        .byte 82,79,76,73,70,67,64,61,59,56,53,51,48,46,43,41
+        .byte 38,36,34,32,30,28,26,24,22,20,18,17,15,14,12,11
+        .byte 10,8,7,6,5,4,3,3,2,1,1,1,0,0,0,0
+        .byte 0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,8
+        .byte 10,11,12,14,15,17,18,20,22,24,26,28,30,32,34,36
+        .byte 38,41,43,46,48,51,53,56,59,61,64,67,70,73,76,79
+        .byte 82,85,88,91,94,97,100,103,107,110,113,116,119,123,126,129
+
+SINETABLE_HI:
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+        .byte 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
 
 
 
@@ -1142,7 +1161,6 @@ SINE_SPEED:
 // Call from offscreen work each frame.
 // -------------------------------------------------------
 DORASTERBARS:
-
         // ---- Step 1: Erase all bars (write black to old positions) ----
         lda     #BAR_COUNT-1
         sta     ZP_BARX
@@ -1151,7 +1169,9 @@ ERASE_BAR:
         ldx     ZP_BARX
         lda     BAR_YPOS,x
         sta     ZP_BARPTR
-        lda     #>COLORTABLE
+        lda     BAR_YPOS_HI,x
+        clc
+        adc     #>COLORTABLE
         sta     ZP_BARPTR+1
 
         lda     #$00
@@ -1177,7 +1197,7 @@ ERASE_BAR:
         lda     SINE_IDX
         clc
         adc     SINE_SPEED
-        sta     SINE_IDX            // wraps naturally mod 256
+        sta     SINE_IDX
 
         // ---- Step 3: Update bar positions and paint ----
         lda     #BAR_COUNT-1
@@ -1186,35 +1206,29 @@ ERASE_BAR:
 UPDATE_BAR:
         ldx     ZP_BARX
 
-        // Compute sine index for this bar: SINE_IDX + BAR_PHASE[x]
         lda     SINE_IDX
         clc
-        adc     BAR_PHASE,x         // wraps mod 256 — that's fine, table is 256 entries
+        adc     BAR_PHASE,x
         tay
-        lda     SINETABLE,y         // new Y position (COLORTABLE offset)
-        sta     BAR_YPOS,x          // save for next frame's erase
+        lda     SINETABLE,y
+        sta     BAR_YPOS,x
+        lda     SINETABLE_HI,y
+        sta     BAR_YPOS_HI,x
 
-        // Set up ZP_BARPTR = COLORTABLE + BAR_YPOS[x]
-        // Since COLORTABLE is page-aligned (.align 256), we just need:
-        //   ZP_BARPTR lo = BAR_YPOS[x]
-        //   ZP_BARPTR hi = >COLORTABLE
+        lda     BAR_YPOS,x
         sta     ZP_BARPTR
-        lda     #>COLORTABLE
+        lda     BAR_YPOS_HI,x
+        clc
+        adc     #>COLORTABLE
         sta     ZP_BARPTR+1
 
-        // Set up source pointer to color pattern for this bar type
         lda     BAR_TYPE,x
         tay
-        lda     BAR_COLOR_LO,y
-        sta     ZP_BARCOL           // reuse as src ptr lo — need 2 ZP bytes
-        // Actually need a second ZP pointer for source.
-        // Let's use ZP_SRCPTR = $f9/$fa
         lda     BAR_COLOR_LO,y
         sta     $f9
         lda     BAR_COLOR_HI,y
         sta     $fa
 
-        // Paint 7 bytes: (ZP_BARPTR)[0..6] = (ZP_SRCPTR)[0..6]
         ldy     #0
         lda     ($f9),y
         sta     (ZP_BARPTR),y
@@ -1235,7 +1249,7 @@ UPDATE_BAR:
         sta     (ZP_BARPTR),y
         iny
         lda     ($f9),y
-        sta     (ZP_BARPTR),y       // 7 unrolled indirect stores
+        sta     (ZP_BARPTR),y
 
         dec     ZP_BARX
         bpl     UPDATE_BAR
