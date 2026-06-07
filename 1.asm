@@ -19,6 +19,7 @@
 .label TABLESTART      = 15
 .label TABLEND         = 288
 .label TABLESIZE       = TABLEND - TABLESTART
+.label PHASE3_SIZE     = 37
 .label DISPLAYON       = %00011011
 .label DISPOFF_TOP     = 36
 .label DISPON_LEN      = 200
@@ -26,6 +27,7 @@
 .label SCROLLRAM       = $0400 + SCROLLROW * 40
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
 .label garbagebyte     = $3fff
+.label COLORTABLE2 = COLORTABLE + 236 // Used in PHASE3_LOOP
 
 // Raster line where PHASE1 starts (IRQ trigger when PHASE1 active)
 .label PHASE1_RASTER   = TABLESTART - 1
@@ -501,32 +503,19 @@ PHASE2_LAST:
         nop
         nop
         nop                             // adjust NOPs to fill last line
-        inx
+        ldx		#$00					// Reset x, as PHASE3_LOOP that comes next use COLORTABLE2 instead of COLORTABLE - This is to prevent wrap around of X
 PHASE3_JMP:
         jmp     PHASE3_LOOP
 
-        // -------------------------------------------------------
+        // -------------------------------------------------------------------
         // PHASE3: raster bars for main display area
-        // -------------------------------------------------------
+        // PHASE3 is split into two loops as the last loop's lda COLORTABLE2,x
+        // is crossing a page boundary causing an extra cycle to be used
+        // -------------------------------------------------------------------
 PHASE3_LOOP:
-        lda     COLORTABLE,x
+        lda     COLORTABLE2,x
         sta     VICBORDER
-        sta		VICBGCOLOR
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop        
-        nop
-        nop
-        nop
-        nop
-
-
-//		clc
-//		bcc *+2
-		
+        sta     VICBGCOLOR
         nop
         nop
         nop
@@ -538,10 +527,50 @@ PHASE3_LOOP:
         nop
         nop
         nop
-        nop                             // 22 NOPs = 44
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop                             // 22 NOPs = 44 cycles
         inx
-        cpx     #TABLESIZE
+        cpx     #20
         bne     PHASE3_LOOP
+
+PHASE3_LOOP_B:
+        lda     COLORTABLE2,x
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+		clc
+		bcc *+2
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop                             // 21 NOPs = 42 cycles
+        inx
+        cpx     #PHASE3_SIZE
+        bne     PHASE3_LOOP_B
+
 
         // -------------------------------------------------------
         // OFFSCREEN_WORK: runs when Phase3 is active.
@@ -1120,23 +1149,26 @@ DORASTERBARS:
 
 ERASE_BAR:
         ldx     ZP_BARX
-        lda     BAR_YPOS,x          // COLORTABLE offset for top of bar
-        tay                         // Y = index into COLORTABLE
+        lda     BAR_YPOS,x
+        sta     ZP_BARPTR
+        lda     #>COLORTABLE
+        sta     ZP_BARPTR+1
 
         lda     #$00
-        sta     COLORTABLE,y
+        ldy     #0
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y
+        sta     (ZP_BARPTR),y
         iny
-        sta     COLORTABLE,y        // 7 stores — unrolled, no inner loop
+        sta     (ZP_BARPTR),y
 
         dec     ZP_BARX
         bpl     ERASE_BAR
@@ -1209,3 +1241,6 @@ UPDATE_BAR:
         bpl     UPDATE_BAR
 
         rts
+        
+		//		clc
+		//		bcc *+2
