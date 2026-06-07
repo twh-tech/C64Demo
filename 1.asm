@@ -41,7 +41,7 @@ START:
         //lda		#$36		// Disable Kernal and Basic
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
 
-        // set garbage byte to visible value for open border testing
+        // set garbage byte that will show in the top and bottom open borders
         lda     #$00
         sta     garbagebyte
 
@@ -605,8 +605,12 @@ OFFSCREEN_WORK:
         sta     VICBORDER
         sta     VICBGCOLOR
 
+        jsr		DORASTERBARS
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
+
         //jsr     $180c               // SID player Bombo
-        jsr 	$A007	// Sid Player Ark Pandora
+        //jsr 	$A007	// Sid Player Ark Pandora
     	lda SID_FRAMES_LEFT
     	bne skip_high_dec
     	dec SID_FRAMES_LEFT+1
@@ -625,9 +629,6 @@ skip_high_dec:
 sid_done:
 
 
-        jsr		DORASTERBARS
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
         //inc     $d001
 
 		// Check if leading bar is in Phase1 area -> switch to State B
@@ -665,8 +666,13 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBORDER
         sta     VICBGCOLOR
 
+		jsr		DORASTERBARS
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
+
+
         //jsr     $180c               // SID player Bombo
-        jsr 	$A007	// Sid Player Ark Pandora
+        //jsr 	$A007	// Sid Player Ark Pandora
         lda SID_FRAMES_LEFT
     	bne skip_high_dec2
     	dec SID_FRAMES_LEFT+1
@@ -684,9 +690,6 @@ skip_high_dec2:
     	jsr $b4c0
 sid_done2:
         
-		jsr		DORASTERBARS
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
 
 		// Check if leading bar has left Phase1 area -> switch to State A
         lda     PHASE_STATE
@@ -1061,7 +1064,7 @@ SCROLLBUF2:
         .fill 256, $20
 
 PHASE_STATE:
-        .byte 1     // 0 = State A: Phase1 skipped, Phase3 active
+        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
                     // 1 = State B: Phase1 active, Phase3 skipped
 
 //* = $1800
@@ -1137,8 +1140,8 @@ MAKESOLID:
 // Labels used by bar system
 // -------------------------------------------------------
 
-.label BAR_COUNT        = 2
-.label BAR_HEIGHT       = 7        // changed from 7 to 5, no black edges
+.label BAR_COUNT        = 5
+.label BAR_HEIGHT       = 7
 .label RASTERBAR_TOP    = 50
 .label RASTERBAR_BOT    = 285
 .label VISIBLE_RANGE    = RASTERBAR_BOT - RASTERBAR_TOP - BAR_HEIGHT
@@ -1182,8 +1185,8 @@ BAR_TYPE:
         .byte 0    // red
         .byte 1    // blue
         .byte 2    // gray
-//        .byte 3    // green
-//        .byte 4    // yellow
+        .byte 3    // green
+        .byte 4    // yellow
 
 // -------------------------------------------------------
 // BAR COLOR PATTERNS
@@ -1302,13 +1305,9 @@ ERASE_BAR:
         adc     SINE_SPEED
         sta     SINE_IDX
 
-        // ---- Step 3: Update bar positions and paint ----
-        lda     #BAR_COUNT-1
-        sta     ZP_BARX
-
-UPDATE_BAR:
-        ldx     ZP_BARX
-
+// ---- Step 3: Update all bar positions first ----
+        ldx     #0
+UPDATEPOS_BAR:
         lda     SINE_IDX
         clc
         adc     BAR_PHASE,x
@@ -1317,7 +1316,40 @@ UPDATE_BAR:
         sta     BAR_YPOS,x
         lda     SINETABLE_HI,y
         sta     BAR_YPOS_HI,x
+        inx
+        cpx     #BAR_COUNT
+        bne     UPDATEPOS_BAR
 
+        // ---- Step 4: Paint bars in correct order ----
+        lda     PHASE_STATE
+        bne     PAINT_STATE_B
+
+        // State A: paint bar 0 last (on top), count down
+PAINT_STATE_A:
+        ldx     #BAR_COUNT-1
+PAINT_A_LOOP:
+        stx     ZP_BARX
+        jsr     PAINTBAR
+        ldx     ZP_BARX
+        dex
+        bpl     PAINT_A_LOOP
+        rts
+
+        // State B: paint bar BAR_COUNT-1 last (on top), count up
+PAINT_STATE_B:
+        ldx     #0
+PAINT_B_LOOP:
+        stx     ZP_BARX
+        jsr     PAINTBAR
+        ldx     ZP_BARX
+        inx
+        cpx     #BAR_COUNT
+        bne     PAINT_B_LOOP
+        rts
+
+        // ---- PAINTBAR: paints single bar at index ZP_BARX ----
+PAINTBAR:
+        ldx     ZP_BARX
         lda     BAR_YPOS,x
         sta     ZP_BARPTR
         lda     BAR_YPOS_HI,x
@@ -1353,10 +1385,6 @@ UPDATE_BAR:
         iny
         lda     ($f9),y
         sta     (ZP_BARPTR),y
-
-        dec     ZP_BARX
-        bpl     UPDATE_BAR
-
         rts
         
 		//		clc
