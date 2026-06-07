@@ -28,6 +28,7 @@
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
 .label garbagebyte     = $3fff
 .label COLORTABLE2 = COLORTABLE + 236 // Used in PHASE3_LOOP
+.label PHASE3_START_IDX = 236
 
 // Raster line where PHASE1 starts (IRQ trigger when PHASE1 active)
 .label PHASE1_RASTER   = TABLESTART - 1
@@ -573,13 +574,69 @@ PHASE3_LOOP_B:
 
 
         // -------------------------------------------------------
-        // OFFSCREEN_WORK: runs when Phase3 is active.
+        // OFFSCREEN_WORK: runs when Phase 1 is skipped and Phase3 is active.
         // -------------------------------------------------------
 OFFSCREEN_WORK:
         lda     #$00
         sta     VICBORDER
         sta     VICBGCOLOR
 
+        jsr     $180c               // SID player
+        jsr		DORASTERBARS
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
+        //inc     $d001
+
+		// Check if leading bar is in Phase1 area -> switch to State B
+        lda     PHASE_STATE
+        bne     NO_SWITCH_A         // already in State B, skip
+        lda     BAR_YPOS_HI         // leading bar (bar 0)
+        bne     NO_SWITCH_A         // HI=1 means in Phase3 area, no switch
+        lda     BAR_YPOS
+        cmp     #BARTABLE_OFFSET
+        bcs     NO_SWITCH_A         // >= BARTABLE_OFFSET means in Phase2 area, no switch
+        // Switch to State B
+        lda     #PHASE1_RASTER
+        sta     VICRASTER
+        lda     #<PHASE1_ACTIVE
+        sta     IRQHANDLER+1
+        lda     #>PHASE1_ACTIVE
+        sta     IRQHANDLER+2
+        lda     #<OFFSCREEN_WORK_SKIP
+        sta     PHASE3_JMP+1
+        lda     #>OFFSCREEN_WORK_SKIP
+        sta     PHASE3_JMP+2
+        lda     #1
+        sta     PHASE_STATE
+NO_SWITCH_A:
+        // restore 25-row mode - re-arms open border trick for next frame
+        lda     #$1b
+        sta     VICICR
+        rti
+
+        // -------------------------------------------------------
+        // OFFSCREEN_WORK_SKIP: runs when Phase 1 is active and Phase3 is skipped.
+        // -------------------------------------------------------
+OFFSCREEN_WORK_SKIP:
+        lda     #$00
+        sta     VICBORDER
+        sta     VICBGCOLOR
+
+        jsr     $180c               // SID player
+		jsr		DORASTERBARS
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
+
+		// Check if leading bar has left Phase1 area -> switch to State A
+        lda     PHASE_STATE
+        beq     NO_SWITCH_B         // already in State A, skip
+        lda     BAR_YPOS_HI         // leading bar (bar 0)
+        bne     DO_SWITCH_A         // HI=1 means beyond index 255, definitely in Phase3
+        lda     BAR_YPOS
+        cmp     #PHASE3_START_IDX - (BAR_HEIGHT - 1)   // = 230
+        bcc     NO_SWITCH_B         // bottom of bar not yet in Phase3, no switch
+DO_SWITCH_A:
+        // Switch to State A
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -590,38 +647,12 @@ OFFSCREEN_WORK:
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
-
-        jsr     $180c               // SID player
-        jsr		DORASTERBARS
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
-        //inc     $d001
-
+        lda     #0
+        sta     PHASE_STATE
+NO_SWITCH_B:
         // restore 25-row mode - re-arms open border trick for next frame
         lda     #$1b
         sta     VICICR
-
-        rti
-
-        // -------------------------------------------------------
-        // OFFSCREEN_WORK_SKIP: runs when Phase3 is skipped.
-        // -------------------------------------------------------
-OFFSCREEN_WORK_SKIP:
-        lda     #$00
-        sta     VICBORDER
-        sta     VICBGCOLOR
-
-        lda     #PHASE1_RASTER
-        sta     VICRASTER
-
-        jsr     $180c               // SID player
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
-
-        // restore 25-row mode - re-arms open border trick for next frame
-        lda     #$1b
-        sta     VICICR
-
         rti
 
         // -------------------------------------------------------
@@ -967,6 +998,10 @@ SCROLLBUF:
 * = $3100
 SCROLLBUF2:
         .fill 256, $20
+
+PHASE_STATE:
+        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
+                    // 1 = State B: Phase1 active, Phase3 skipped
 
 * = $1800
 .import binary "bombo.sid", 126
