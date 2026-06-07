@@ -37,12 +37,16 @@
 .label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
 
 START:
-        lda     #$35
+        lda     #$35		// Disable Kernal
+        //lda		#$36		// Disable Kernal and Basic
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
 
         // set garbage byte to visible value for open border testing
         lda     #$00
         sta     garbagebyte
+
+		lda		#$01
+		jsr		$b4c0	// Init the SID tune Ark Pandora
 
         sei
         //jsr     SETUPSPRITE
@@ -601,7 +605,26 @@ OFFSCREEN_WORK:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        jsr     $180c               // SID player
+        //jsr     $180c               // SID player Bombo
+        jsr 	$A007	// Sid Player Ark Pandora
+    	lda SID_FRAMES_LEFT
+    	bne skip_high_dec
+    	dec SID_FRAMES_LEFT+1
+skip_high_dec:
+    	dec SID_FRAMES_LEFT
+    	lda SID_FRAMES_LEFT
+    	ora SID_FRAMES_LEFT+1
+    	bne sid_done
+
+    	lda #$40
+    	sta SID_FRAMES_LEFT
+    	lda #$14
+    	sta SID_FRAMES_LEFT+1
+    	lda #$01
+    	jsr $b4c0
+sid_done:
+
+
         jsr		DORASTERBARS
         jsr     DOSCROLL
         jsr     UPDATESPEED
@@ -642,7 +665,25 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        jsr     $180c               // SID player
+        //jsr     $180c               // SID player Bombo
+        jsr 	$A007	// Sid Player Ark Pandora
+        lda SID_FRAMES_LEFT
+    	bne skip_high_dec2
+    	dec SID_FRAMES_LEFT+1
+skip_high_dec2:
+    	dec SID_FRAMES_LEFT
+    	lda SID_FRAMES_LEFT
+    	ora SID_FRAMES_LEFT+1
+    	bne sid_done2
+
+    	lda #$40
+    	sta SID_FRAMES_LEFT
+    	lda #$14
+    	sta SID_FRAMES_LEFT+1
+    	lda #$01
+    	jsr $b4c0
+sid_done2:
+        
 		jsr		DORASTERBARS
         jsr     DOSCROLL
         jsr     UPDATESPEED
@@ -1023,12 +1064,19 @@ PHASE_STATE:
         .byte 1     // 0 = State A: Phase1 skipped, Phase3 active
                     // 1 = State B: Phase1 active, Phase3 skipped
 
-* = $1800
-.import binary "bombo.sid", 126
+//* = $1800
+//.import binary "bombo.sid", 126
+
+* = $a000
+.import binary "Ark_Pandora.sid", 126
+SID_FRAMES_LEFT:  .word 5200
 
 * = $2800
 .var charset = LoadBinary("ace2char.bin", BF_C64FILE)
 .fill charset.getSize(), charset.get(i)
+
+* = $3300
+.import binary "all_spr/uridium.spr"
 
 .print "SCROLLTEXT = $"+toHexString(SCROLLTEXT)
 .print "TEXTLENGTH = "+TEXTLENGTH
