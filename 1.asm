@@ -7,6 +7,7 @@
         .byte   $00,$00,$00
         *=$0810 "Start"
 
+.label MAINLOOP_PTR    = $f7    // 2 bytes on zero page: $f7 (lo), $f8 (hi)
 .label IRQVEC          = $0314
 .label VICICR          = $d011
 .label VICRASTER       = $d012
@@ -38,6 +39,12 @@
 .label PHASE2_RASTER = 50 
 
 START:
+		// This is for measuring how many cycles spent in MAINLOOP
+		lda #<$5000
+		sta MAINLOOP_PTR
+		lda #>$5000
+		sta MAINLOOP_PTR+1
+
         lda     #$35		// Disable Kernal
         //lda		#$36		// Disable Kernal and Basic
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
@@ -46,7 +53,7 @@ START:
 		//jsr		$b4c0	// Init the SID tune Ark Pandora
 
         sei
-        //jsr     SETUPSPRITE
+        jsr     SETUPSPRITE
 
         // Clear pending VIC IRQ flags
         lda     #$ff
@@ -178,8 +185,10 @@ COLORBOTTOMSCROLLLINE:
         sta     VICMEMCTRL
 
         cli
+
 MAINLOOP:
-        jmp     MAINLOOP
+        inc MAINLOOP_COUNT
+        jmp MAINLOOP
 
 DUMMY_NMI:
         rti
@@ -603,11 +612,38 @@ OFFSCREEN_WORK:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-        jsr		DORASTERBARS
-        //jsr     DOSCROLL
+/////////////////////////////////////////////////////
+        // Save measurement
+        lda MAINLOOP_COUNT
+        ldy #0
+        sta (MAINLOOP_PTR),y
+
+        // Advance 16-bit pointer
+        inc MAINLOOP_PTR
+        bne skip_hi_inc
+        inc MAINLOOP_PTR+1
+skip_hi_inc:
+
+        // Reset counter
+        lda #0
+        sta MAINLOOP_COUNT
+/////////////////////////////////////////////////////
+
+
+//        jsr		DORASTERBARS
+        jsr     DOSCROLL
         jsr     UPDATESPEED
 
-        //jsr     $180c               // SID player Bombo
+        //inc     $d001
+        //inc     $d003  
+        //inc     $d005
+        inc     $d007  
+        //inc     $d009
+        //inc     $d00b  
+        //inc     $d00d
+        //inc     $d00f 
+
+//        jsr     $180c               // SID player Bombo
         //jsr 	$A007	// Sid Player Ark Pandora
         jmp sid_done
     	lda SID_FRAMES_LEFT
@@ -662,12 +698,40 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBORDER
         sta     VICBGCOLOR
 
-		jsr		DORASTERBARS
-        //jsr     DOSCROLL
+
+/////////////////////////////////////////////////////
+        // Save measurement
+        lda MAINLOOP_COUNT
+        ldy #0
+        sta (MAINLOOP_PTR),y
+
+        // Advance 16-bit pointer
+        inc MAINLOOP_PTR
+        bne skip_hi_inc2
+        inc MAINLOOP_PTR+1
+skip_hi_inc2:
+
+        // Reset counter
+        lda #0
+        sta MAINLOOP_COUNT
+/////////////////////////////////////////////////////
+
+
+//		jsr		DORASTERBARS
+        jsr     DOSCROLL
         jsr     UPDATESPEED
 
+        //inc     $d001
+        //inc     $d003  
+        //inc     $d005
+        inc     $d007  
+        //inc     $d009
+        //inc     $d00b  
+        //inc     $d00d
+        //inc     $d00f 
 
-        //jsr     $180c               // SID player Bombo
+
+//        jsr     $180c               // SID player Bombo
         //jsr 	$A007	// Sid Player Ark Pandora
 		jmp sid_done2
         lda SID_FRAMES_LEFT
@@ -1057,6 +1121,13 @@ COLORTABLE:
         .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
         .byte $07,$05,$01
 
+//* = $1800 "SID Player - Bombo"
+//.import binary "bombo.sid", 126
+
+* = $2800 "Character set"
+.var charset = LoadBinary("ace2char.bin", BF_C64FILE)
+.fill charset.getSize(), charset.get(i)
+
 * = $3000 "SCROLLBUF"
 SCROLLBUF:
         .fill 256, $20
@@ -1064,10 +1135,6 @@ SCROLLBUF:
 * = $3100 "SCROLLBUF2"
 SCROLLBUF2:
         .fill 256, $20
-
-* = $2800 "Character set"
-.var charset = LoadBinary("ace2char.bin", BF_C64FILE)
-.fill charset.getSize(), charset.get(i)
 
 * = $3300 "SETUPSPRITE and stuff"
 
@@ -1162,7 +1229,8 @@ MAKESOLID:
         // Display ends around raster 250, sprite is 21 pixels tall
         // Y=241 puts it half in display half in border
         //lda		#$ff
-        lda		#$17
+        //lda		#$17
+		lda		#$fc                
         sta     $d001
         sta     $d003  
         sta     $d005
@@ -1173,7 +1241,8 @@ MAKESOLID:
         sta     $d00f  
 
         // Enable sprite 0
-        lda     #%11111111
+//        lda     #%11111111
+        lda     #%00001000
         sta     $d015
 
         rts
@@ -1431,12 +1500,15 @@ PAINTBAR:
 // Reserve the garbagebyte - nothing must ever be assembled here
 
 * = $3FFF "Garbagebyte"
-.byte $00    // garbagebyte - must stay $00 for open border trick
+//.byte $55    // garbagebyte - must stay $00 for open border trick
+.byte $00
 
 //.import binary "all_spr/uridium.spr"
-//* = $1800
-//.import binary "bombo.sid", 126
 
 //* = $a000
 //.import binary "Ark_Pandora.sid", 126
 SID_FRAMES_LEFT:  .word 5200
+MAINLOOP_COUNT:   .byte 0
+
+* = $5000 "Measurement buffer"
+.fill $2000, 0
