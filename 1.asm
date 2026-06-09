@@ -1,11 +1,11 @@
-*=$0801
+*=$0801 "Basic stub"
         .byte   $0b,$08
         .byte   $0a,$00
         .byte   $9e
         .byte   $20
         .text   "2064"
         .byte   $00,$00,$00
-        *=$0810
+        *=$0810 "Start"
 
 .label IRQVEC          = $0314
 .label VICICR          = $d011
@@ -16,37 +16,34 @@
 .label VICBORDER       = $d020
 .label VICBGCOLOR      = $d021
 .label VICIRQENABLE    = $d01a
-.label TABLESTART      = 15
+.label TABLESTART      = 16
 .label TABLEND         = 288
 .label TABLESIZE       = TABLEND - TABLESTART
 .label PHASE3_SIZE     = 37
 .label DISPLAYON       = %00011011
-.label DISPOFF_TOP     = 36
+//.label DISPOFF_TOP     = 36
+.label DISPOFF_TOP = 35   // was 36, compensate for TABLESTART moving from 15 to 16
 .label DISPON_LEN      = 200
 .label SCROLLROW       = 12
 .label SCROLLRAM       = $0400 + SCROLLROW * 40
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
-.label garbagebyte     = $3fff
-.label COLORTABLE2 = COLORTABLE + 236 // Used in PHASE3_LOOP
-.label PHASE3_START_IDX = 236
+.label PHASE3_START_IDX = 235 // was 236
+.label COLORTABLE2 = COLORTABLE + 235 // Used in PHASE3_LOOP
 
 // Raster line where PHASE1 starts (IRQ trigger when PHASE1 active)
 .label PHASE1_RASTER   = TABLESTART - 1
 
 // Raster line where PHASE2 starts (IRQ trigger when PHASE1 skipped)
-.label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
+//.label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
+.label PHASE2_RASTER = 50 
 
 START:
         lda     #$35		// Disable Kernal
         //lda		#$36		// Disable Kernal and Basic
         sta     $01             // RAM under BASIC+KERNAL, I/O still visible
 
-        // set garbage byte that will show in the top and bottom open borders
-        lda     #$00
-        sta     garbagebyte
-
 		lda		#$01
-		jsr		$b4c0	// Init the SID tune Ark Pandora
+		//jsr		$b4c0	// Init the SID tune Ark Pandora
 
         sei
         //jsr     SETUPSPRITE
@@ -249,6 +246,7 @@ PHASE1_LOOP:
         inx
         cpx     #DISPOFF_TOP
         bne     PHASE1_LOOP
+        jmp     PHASE2_ENTRY
 
 PHASE2_ENTRY_SKIP:
         ldx     #DISPOFF_TOP
@@ -606,11 +604,12 @@ OFFSCREEN_WORK:
         sta     VICBGCOLOR
 
         jsr		DORASTERBARS
-        jsr     DOSCROLL
+        //jsr     DOSCROLL
         jsr     UPDATESPEED
 
         //jsr     $180c               // SID player Bombo
         //jsr 	$A007	// Sid Player Ark Pandora
+        jmp sid_done
     	lda SID_FRAMES_LEFT
     	bne skip_high_dec
     	dec SID_FRAMES_LEFT+1
@@ -627,9 +626,6 @@ skip_high_dec:
     	lda #$01
     	jsr $b4c0
 sid_done:
-
-
-        //inc     $d001
 
 		// Check if leading bar is in Phase1 area -> switch to State B
         lda     PHASE_STATE
@@ -667,12 +663,13 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBGCOLOR
 
 		jsr		DORASTERBARS
-        jsr     DOSCROLL
+        //jsr     DOSCROLL
         jsr     UPDATESPEED
 
 
         //jsr     $180c               // SID player Bombo
         //jsr 	$A007	// Sid Player Ark Pandora
+		jmp sid_done2
         lda SID_FRAMES_LEFT
     	bne skip_high_dec2
     	dec SID_FRAMES_LEFT+1
@@ -690,7 +687,7 @@ skip_high_dec2:
     	jsr $b4c0
 sid_done2:
         
-
+        //inc     $d001
 		// Check if leading bar has left Phase1 area -> switch to State A
         lda     PHASE_STATE
         beq     NO_SWITCH_B         // already in State A, skip
@@ -719,9 +716,14 @@ NO_SWITCH_B:
         sta     VICICR
         rti
 
+PHASE_STATE:
+        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
+                    // 1 = State B: Phase1 active, Phase3 skipped
+
         // -------------------------------------------------------
         // DOSCROLL
         // -------------------------------------------------------
+* = * "Scroll engine"
 DOSCROLL:
         lda     SCROLLX
         sec
@@ -1035,51 +1037,39 @@ SPEEDTABLE:
 
 .align 256
 COLORTABLE:
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$0a,$0b,$0c,$0d,$0e,$0f
-        .byte $0e,$0d,$0c,$0b,$0a,$09,$08,$07,$06,$05,$04,$03,$02,$01
-        .byte $00,$01,$02
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05
+        .byte $01,$04,$07,$05,$01,$04,$07,$05,$01,$04,$07,$05,$01,$04
+        .byte $07,$05,$01
 
-* = $3000
+* = $3000 "SCROLLBUF"
 SCROLLBUF:
         .fill 256, $20
 
-* = $3100
+* = $3100 "SCROLLBUF2"
 SCROLLBUF2:
         .fill 256, $20
 
-PHASE_STATE:
-        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
-                    // 1 = State B: Phase1 active, Phase3 skipped
-
-//* = $1800
-//.import binary "bombo.sid", 126
-
-* = $a000
-.import binary "Ark_Pandora.sid", 126
-SID_FRAMES_LEFT:  .word 5200
-
-* = $2800
+* = $2800 "Character set"
 .var charset = LoadBinary("ace2char.bin", BF_C64FILE)
 .fill charset.getSize(), charset.get(i)
 
-* = $3300
-.import binary "all_spr/uridium.spr"
+* = $3300 "SETUPSPRITE and stuff"
 
 .print "SCROLLTEXT = $"+toHexString(SCROLLTEXT)
 .print "TEXTLENGTH = "+TEXTLENGTH
@@ -1113,24 +1103,77 @@ MAKESOLID:
         // Point sprite 0 to $3800
         lda     #$e0
         sta     $07f8
+		sta     $07f9           // sprite 1 pointer
+        sta     $07fa
+		sta     $07fb           // sprite 1 pointer
+        sta     $07fc
+		sta     $07fd           // sprite 1 pointer
+        sta     $07fe
+		sta     $07ff           // sprite 1 pointer
 
         // Sprite color: light blue = $0e
-        lda     #$0e
+        lda     #$01
         sta     $d027
+        clc
+		adc #1
+        sta     $d028           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d029           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d02a           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d02b           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d02c           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d02d           // sprite 1 color        
+        clc
+		adc #1
+        sta     $d02e           // sprite 1 color        
 
-        // X position: horizontal middle = 160
-        lda     #160
-        sta     $d000
+// X positions evenly distributed across screen
+        lda     #24
+        sta     $d000           // sprite 0 X = 24
+        lda     #66
+        sta     $d002           // sprite 1 X = 66
+        lda     #108
+        sta     $d004           // sprite 2 X = 108
+        lda     #150
+        sta     $d006           // sprite 3 X = 150
+        lda     #192
+        sta     $d008           // sprite 4 X = 192
+        lda     #234
+        sta     $d00a           // sprite 5 X = 234
+        lda     #20             // 276 - 256 = 20
+        sta     $d00c           // sprite 6 X low byte (full X = 276)
+        lda     #62             // 318 - 256 = 62
+        sta     $d00e           // sprite 7 X low byte (full X = 318)
+        // Set MSB for sprites 6 and 7 (X >= 256)
+        lda     #%11000000
+        sta     $d010
+
 
         // Y position: straddling display/bottom border
         // Display ends around raster 250, sprite is 21 pixels tall
         // Y=241 puts it half in display half in border
-        lda     #251
-        //lda		#255
+        //lda		#$ff
+        lda		#$17
         sta     $d001
+        sta     $d003  
+        sta     $d005
+        sta     $d007  
+        sta     $d009
+        sta     $d00b  
+        sta     $d00d
+        sta     $d00f  
 
         // Enable sprite 0
-        lda     #%00000001
+        lda     #%11111111
         sta     $d015
 
         rts
@@ -1142,7 +1185,7 @@ MAKESOLID:
 
 .label BAR_COUNT        = 5
 .label BAR_HEIGHT       = 7
-.label RASTERBAR_TOP    = 50
+.label RASTERBAR_TOP    = 51 // was 50
 .label RASTERBAR_BOT    = 285
 .label VISIBLE_RANGE    = RASTERBAR_BOT - RASTERBAR_TOP - BAR_HEIGHT
 .label BARTABLE_OFFSET  = RASTERBAR_TOP - TABLESTART   // = 35
@@ -1205,33 +1248,24 @@ BAR_COLOR_LO:
 BAR_COLOR_HI:
         .byte >BAR_COLORS_0, >BAR_COLORS_1, >BAR_COLORS_2, >BAR_COLORS_3, >BAR_COLORS_4
 
-// -------------------------------------------------------
-// SINE TABLE
-// 256 entries, range scaled to VISIBLE_RANGE
-// Values are COLORTABLE offsets: BARTABLE_OFFSET .. BARTABLE_OFFSET+VISIBLE_RANGE
-// Generate with: BARTABLE_OFFSET + (sin(i/256*2pi)+1)/2 * VISIBLE_RANGE
-//
-// VISIBLE_RANGE = 285 - 50 - 7 = 228
-// BARTABLE_OFFSET = 35
-// So values range from 35 to 35+228 = 263
-// -------------------------------------------------------
+
 SINETABLE:
-        .byte 133,136,139,142,146,149,152,155,158,162,165,168,171,174,177,180
-        .byte 183,186,189,192,195,198,201,204,206,209,212,214,217,219,222,224
-        .byte 227,229,231,233,235,237,239,241,243,245,247,248,250,251,253,254
-        .byte 255,1,2,3,4,5,6,6,7,8,8,8,9,9,9,9
-        .byte 10,9,9,9,9,8,8,8,7,6,6,5,4,3,2,1
-        .byte 255,254,253,251,250,248,247,245,243,241,239,237,235,233,231,229
-        .byte 227,224,222,219,217,214,212,209,206,204,201,198,195,192,189,186
-        .byte 183,180,177,174,171,168,165,162,158,155,152,149,146,142,139,136
-        .byte 133,129,126,123,119,116,113,110,107,103,100,97,94,91,88,85
-        .byte 82,79,76,73,70,67,64,61,59,56,53,51,48,46,43,41
+        .byte 132,135,139,142,145,148,151,155,158,161,164,167,170,174,177,180
+        .byte 183,186,189,192,194,197,200,203,206,208,211,214,216,219,221,223
+        .byte 226,228,230,232,234,236,238,240,242,244,246,247,249,250,252,253
+        .byte 254,0,1,2,3,4,5,5,6,7,7,8,8,8,8,8
+        .byte 9,8,8,8,8,8,7,7,6,5,5,4,3,2,1,0
+        .byte 254,253,252,250,249,247,246,244,242,240,238,236,234,232,230,228
+        .byte 226,223,221,219,216,214,211,208,206,203,200,197,194,192,189,186
+        .byte 183,180,177,174,170,167,164,161,158,155,151,148,145,142,139,135
+        .byte 132,129,125,122,119,116,113,109,106,103,100,97,94,90,87,84
+        .byte 81,78,75,72,70,67,64,61,58,56,53,50,48,45,43,41
         .byte 38,36,34,32,30,28,26,24,22,20,18,17,15,14,12,11
-        .byte 10,8,7,6,5,4,3,3,2,1,1,1,0,0,0,0
-        .byte 0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,8
+        .byte 10,8,7,6,5,4,3,3,2,1,1,0,0,0,0,0
+        .byte 0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8
         .byte 10,11,12,14,15,17,18,20,22,24,26,28,30,32,34,36
-        .byte 38,41,43,46,48,51,53,56,59,61,64,67,70,73,76,79
-        .byte 82,85,88,91,94,97,100,103,107,110,113,116,119,123,126,129
+        .byte 38,41,43,45,48,50,53,56,58,61,64,67,70,72,75,78
+        .byte 81,84,87,90,94,97,100,103,106,109,113,116,119,122,125,129
 
 SINETABLE_HI:
         .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -1266,6 +1300,7 @@ SINE_SPEED:
 // DORASTERBARS
 // Call from offscreen work each frame.
 // -------------------------------------------------------
+* = * "Raster bar engine"
 DORASTERBARS:
         // ---- Step 1: Erase all bars (write black to old positions) ----
         lda     #BAR_COUNT-1
@@ -1389,3 +1424,19 @@ PAINTBAR:
         
 		//		clc
 		//		bcc *+2
+
+.print "SINETABLE = $"+toHexString(SINETABLE)
+.print "COLORTABLE = $"+toHexString(COLORTABLE)
+
+// Reserve the garbagebyte - nothing must ever be assembled here
+
+* = $3FFF "Garbagebyte"
+.byte $00    // garbagebyte - must stay $00 for open border trick
+
+//.import binary "all_spr/uridium.spr"
+//* = $1800
+//.import binary "bombo.sid", 126
+
+//* = $a000
+//.import binary "Ark_Pandora.sid", 126
+SID_FRAMES_LEFT:  .word 5200
