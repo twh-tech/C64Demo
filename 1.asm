@@ -11,7 +11,7 @@ START:
 
 		InitSidPlayerArkPandora()
 
-        jsr     SETUPSPRITES
+//        jsr     SETUPSPRITES
         
         sei
         // Clear pending VIC IRQ flags
