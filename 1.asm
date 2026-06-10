@@ -48,33 +48,7 @@ START:
         lda     #$01
         sta     VICIRQENABLE
 
-		lda     PHASE_STATE
-        bne     INIT_STATE_B
-        // State A: Phase1 skipped, Phase3 active
-        lda     #PHASE2_RASTER
-        sta     VICRASTER
-        lda     #<PHASE2_ENTRY_SKIP
-        sta     IRQHANDLER+1
-        lda     #>PHASE2_ENTRY_SKIP
-        sta     IRQHANDLER+2
-        lda     #<PHASE3_LOOP
-        sta     PHASE3_JMP+1
-        lda     #>PHASE3_LOOP
-        sta     PHASE3_JMP+2
-        jmp     INIT_DONE
-INIT_STATE_B:
-        // State B: Phase1 active, Phase3 skipped
-        lda     #PHASE1_RASTER
-        sta     VICRASTER
-        lda     #<PHASE1_ACTIVE
-        sta     IRQHANDLER+1
-        lda     #>PHASE1_ACTIVE
-        sta     IRQHANDLER+2
-        lda     #<OFFSCREEN_WORK_SKIP
-        sta     PHASE3_JMP+1
-        lda     #>OFFSCREEN_WORK_SKIP
-        sta     PHASE3_JMP+2
-INIT_DONE:
+		SetRasterStateTopActive()
 
 		jsr		CLEARSCREEN
 		jsr		CLEARCOLORRAM
@@ -88,9 +62,8 @@ MAINLOOP:
 DUMMY_NMI:
         rti
 
-PHASE_STATE:
-        .byte 0     // 0 = State A: Phase1 skipped, Phase3 active
-                    // 1 = State B: Phase1 active, Phase3 skipped
+RASTER_STATE:
+        .byte RASTER_STATE_TOP_ACTIVE
 
 * = $3FFF "Garbagebyte"
 //.byte $55    // garbagebyte - must stay $00 for open border trick

@@ -173,30 +173,33 @@ UPDATEPOS_BAR:
         bne     UPDATEPOS_BAR
 
         // ---- Step 4: Paint bars in correct order ----
-        lda     PHASE_STATE
+        // Paint order depends on which border area is active this frame
+        // TOP_ACTIVE: bar 0 painted last (on top), count down
+        // BOTTOM_ACTIVE: bar BAR_COUNT-1 painted last (on top), count up
+        lda     RASTER_STATE
         bne     PAINT_STATE_B
 
         // State A: paint bar 0 last (on top), count down
 PAINT_STATE_A:
         ldx     #BAR_COUNT-1
-PAINT_A_LOOP:
+!:
         stx     ZP_BARX
         jsr     PAINTBAR
         ldx     ZP_BARX
         dex
-        bpl     PAINT_A_LOOP
+        bpl     !-
         rts
 
         // State B: paint bar BAR_COUNT-1 last (on top), count up
 PAINT_STATE_B:
         ldx     #0
-PAINT_B_LOOP:
+!:
         stx     ZP_BARX
         jsr     PAINTBAR
         ldx     ZP_BARX
         inx
         cpx     #BAR_COUNT
-        bne     PAINT_B_LOOP
+        bne     !-
         rts
 
         // ---- PAINTBAR: paints single bar at index ZP_BARX ----
