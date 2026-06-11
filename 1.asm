@@ -17,7 +17,7 @@ START:
 
 		InitSidPlayerArkPandora()
 
-        jsr     SETUPSPRITES
+      //  jsr     SETUPSPRITES
         jsr		INIT_VIC_AND_IRQ
 
 MAINLOOP:

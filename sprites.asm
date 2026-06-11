@@ -79,6 +79,7 @@ SETUPSPRITES:
         sta     $d003  
         sta     $d005
         sta     $d007  
+        lda		#$17
         sta     $d009
         sta     $d00b  
         sta     $d00d
@@ -86,7 +87,7 @@ SETUPSPRITES:
 
         // Enable sprite 0
 //        lda     #%11111111
-        lda     #%00001000
+        lda     #%00011000
         sta     $d015
 		rts
 
@@ -95,7 +96,7 @@ MOVESPRITES:
         //inc     $d003  
         //inc     $d005
         inc     $d007  
-        //inc     $d009
+        dec     $d009
         //inc     $d00b  
         //inc     $d00d
         //inc     $d00f 

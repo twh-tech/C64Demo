@@ -57,7 +57,7 @@ INIT_VIC_AND_IRQ:
         lda     #$01
         sta     VICIRQENABLE
 
-		SetRasterStateTopActive()
+		SetRasterStateBottomActive()
 
         cli
         rts
@@ -103,7 +103,7 @@ PHASE2_N0:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(4)
+        nops(4)		// Fewer nops here due to bad lines (first raster line in a character row)
         inx
         bne     PHASE2_N1
 
@@ -165,11 +165,11 @@ PHASE2_N7:
         nops(19)
         inx
         dey
-        beq     PHASE2_N7_DONE
+        nop		//beq     PHASE2_N7_DONE
         jmp     PHASE2_N0
-PHASE2_N7_DONE:
-        nop
-        jmp     PHASE3_JMP
+//PHASE2_N7_DONE:
+//        nop
+//        jmp     PHASE3_JMP
 
 PHASE2_LAST:
         lda     #$13
@@ -202,10 +202,8 @@ PHASE3_LOOP_B:
         lda     COLORTABLE2,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(19)
-		clc
-		bcc *+2
-        inx
+        nops(21) // was 19
+		inx
         cpx     #PHASE3_SIZE
         bne     PHASE3_LOOP_B
 
