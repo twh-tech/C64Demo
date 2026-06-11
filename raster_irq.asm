@@ -57,8 +57,8 @@ INIT_VIC_AND_IRQ:
         lda     #$01
         sta     VICIRQENABLE
 
-		SetRasterStateBottomActive()
-
+//		SetRasterStateBottomActive()
+		SetRasterStateTopActive()
         cli
         rts
 
@@ -143,7 +143,9 @@ PHASE2_N5:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(23)
+        cpy     #1                      // 2 cycles - check if last iteration
+        beq     PHASE2_PENULTIMATE      // 3 cycles taken / 2 cycles not taken
+        nops(21)
         inx
         bne     PHASE2_N6
 
@@ -151,9 +153,7 @@ PHASE2_N6:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        cpy     #1                      // 2 cycles - check if last iteration
-        beq     PHASE2_LAST             // 3 cycles taken / 2 cycles not taken
-        nops(21)
+        nops(23)
         inx
         bne     PHASE2_N7
 
@@ -165,17 +165,24 @@ PHASE2_N7:
         nops(19)
         inx
         dey
-        nop		//beq     PHASE2_N7_DONE
+        nop
         jmp     PHASE2_N0
-//PHASE2_N7_DONE:
-//        nop
-//        jmp     PHASE3_JMP
 
-PHASE2_LAST:
+PHASE2_PENULTIMATE:
         lda     #$13
         sta     VICICR
-        nops(17)
-        inx                             // crosses into last raster line
+        nop
+        nop
+        nop
+        nops(16) //was 17
+        inx
+        lda     COLORTABLE,x
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        inx
+        nops(22)
+
+PHASE2_LAST:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
@@ -193,7 +200,9 @@ PHASE3_LOOP:
         lda     COLORTABLE2,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(22)
+        nops(19)//was22
+        clc
+		bcc *+2
         inx
         cpx     #20
         bne     PHASE3_LOOP
@@ -202,7 +211,9 @@ PHASE3_LOOP_B:
         lda     COLORTABLE2,x
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(21) // was 19
+        nops(19) // was 19
+        clc
+		bcc *+2
 		inx
         cpx     #PHASE3_SIZE
         bne     PHASE3_LOOP_B

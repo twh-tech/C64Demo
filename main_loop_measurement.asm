@@ -8,6 +8,19 @@ INIT_MEASUREMENT:
         sta MAINLOOP_PTR+1
         lda #0
         sta MAINLOOP_COUNT
+        tay
+!:      sta (MAINLOOP_PTR),y
+        iny
+        bne !-
+        inc MAINLOOP_PTR+1
+        ldx MAINLOOP_PTR+1
+        cpx #>MEASUREMENT_END+1
+        bne !-
+        // Reset pointer to start
+        lda #<MEASUREMENT_START
+        sta MAINLOOP_PTR
+        lda #>MEASUREMENT_START
+        sta MAINLOOP_PTR+1
         rts
 
 .macro SaveMainloopMeasurement() {
@@ -36,6 +49,3 @@ INIT_MEASUREMENT:
         sta MAINLOOP_COUNT
 }
 
-
-* = MEASUREMENT_START "Measurement buffer"
-.fill MEASUREMENT_END - MEASUREMENT_START + 1, 0
