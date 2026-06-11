@@ -1,3 +1,4 @@
+// sprites.asm
 SETUPSPRITES:
         // Create a solid sprite at $3800
         // In VIC bank 0, sprite pointer value = $3800/64 = $e0
@@ -74,7 +75,8 @@ SETUPSPRITES:
         // Y=241 puts it half in display half in border
         //lda		#$ff
         //lda		#$17
-		lda		#$fc                
+		//lda		#$fc
+		lda		#$fe                
         sta     $d001
         sta     $d003  
         sta     $d005
@@ -89,6 +91,7 @@ SETUPSPRITES:
 //        lda     #%11111111
         lda     #%00011000
         lda     #%00001000
+        lda     #%00000001
         sta     $d015
 		rts
 
@@ -96,7 +99,7 @@ MOVESPRITES:
         //inc     $d001
         //inc     $d003  
         //inc     $d005
-        inc     $d007  
+        inc     $d001  
         dec     $d009
         //inc     $d00b  
         //inc     $d00d

@@ -103,112 +103,109 @@ PHASE2_ENTRY:
         ldy     #25
 
 PHASE2_N0:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(4)		// Fewer nops here due to bad lines (first raster line in a character row)
-        inx
-        bne     PHASE2_N1
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4 
+        nops(4)					// 8	Fewer nops here due to bad lines (first raster line in a character row)
+        inx						// 2
+        bne     PHASE2_N1		// 3	Total = 25, bad lines = 40	Total = 65 ? 
 
 PHASE2_N1:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        inx
-        bne     PHASE2_N2
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        inx						// 2
+        bne     PHASE2_N2		// 3	Total = 63
 
 PHASE2_N2:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        inx
-        bne     PHASE2_N3
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        inx						// 2
+        bne     PHASE2_N3		// 3	Total = 63
 
 PHASE2_N3:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        inx
-        bne     PHASE2_N4
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        inx						// 2
+        bne     PHASE2_N4		// 3	Total = 63
 
 PHASE2_N4:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        inx
-        bne     PHASE2_N5
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        inx						// 2
+        bne     PHASE2_N5		// 3	Total = 63
 
 PHASE2_N5:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        cpy     #1                      // 2 cycles - check if last iteration
-        beq     PHASE2_PENULTIMATE      // 3 cycles taken / 2 cycles not taken
-        nops(21)
-        inx
-        bne     PHASE2_N6
+        lda     COLORTABLE,x		// 4
+        sta     VICBORDER			// 4
+        sta     VICBGCOLOR			// 4
+        cpy     #1                  // 2 cycles - check if last iteration
+        beq     PHASE2_PENULTIMATE  // 2 cycles not taken / 3 cycles taken
+        nops(21)					// 42
+        inx							// 2
+        bne     PHASE2_N6			// 3	Total = 63 on first 24 iterations - Total = 17 on 25th iteration
 
 PHASE2_N6:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        inx
-        bne     PHASE2_N7
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        inx						// 2
+        bne     PHASE2_N7		// 3	Total = 63 
 
 
 PHASE2_N7:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(19)
-        inx
-        dey
-        nop
-        jmp     PHASE2_N0
+        lda     COLORTABLE,x	// 4 
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(19)				// 38
+        inx						// 2
+        dey						// 2
+        nop						// 2
+        jmp     PHASE2_N0		// 3	Total = 59
 
 PHASE2_PENULTIMATE:
-        lda     #$13
-        sta     VICICR
-        nop
-        nop
-        nop
-        nops(16) //was 17
-        inx
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        inx
-        nops(22)
+        lda     #$13			// 2
+        sta     VICICR			// 3
+        nops(19)				// 38
+        inx						// 2	Total = 17 (from PHASE2_N5's last iteration) + 45 = 62
+        // -------------------------
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        inx						// 2
+        nops(22)				// 44	Total = 58
 
 PHASE2_LAST:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(23)
-        ldx		#$00					// Reset x, as PHASE3_LOOP that comes next use COLORTABLE2 instead of COLORTABLE - This is to prevent wrap around of X
+        lda     COLORTABLE,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(23)				// 46
+        ldx		#$00			// 2             Reset x, as PHASE3_LOOP that comes next use COLORTABLE2 instead of COLORTABLE - This is to prevent wrap around of X
 PHASE3_JMP:
-        jmp     PHASE3_LOOP
+        jmp     PHASE3_LOOP		// 3	Total = 63
 
         // -------------------------------------------------------------------
         // PHASE3: raster bars for main display area
         // PHASE3 is split into two loops as the last loop's lda COLORTABLE2,x
         // is crossing a page boundary causing an extra cycle to be used
         // -------------------------------------------------------------------
+.align 256
 PHASE3_LOOP:
-        lda     COLORTABLE2,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        nops(19)//was22
-        clc
-		bcc *+2
-        inx
-        cpx     #20
-        bne     PHASE3_LOOP
+        lda     COLORTABLE2,x	// 4
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+        nops(22)				// 44
+        inx						// 2
+        cpx     #20				// 2
+        bne     PHASE3_LOOP		// 3	Total = 63
 
 PHASE3_LOOP_B:
         lda     COLORTABLE2,x
@@ -235,7 +232,7 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         //jsr		DORASTERBARS
         jsr     DOSCROLL
         jsr     UPDATESPEED
-        jsr     MOVESPRITES
+        //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
      	
@@ -261,7 +258,7 @@ OFFSCREEN_WORK_AFTER_PHASE2:
 		//jsr		DORASTERBARS
         //jsr     DOSCROLL
         //jsr     UPDATESPEED
-        jsr     MOVESPRITES
+        //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
 		

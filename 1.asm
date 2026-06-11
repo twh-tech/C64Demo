@@ -18,7 +18,7 @@ START:
 
 		InitSidPlayerArkPandora()
 
-        jsr     SETUPSPRITES
+//        jsr     SETUPSPRITES
         jsr		INIT_VIC_AND_IRQ
 
 MAINLOOP:
@@ -33,7 +33,7 @@ RASTER_STATE:
 
 * = $3FFF "Garbagebyte"
 //.byte $55    // garbagebyte - must stay $00 for open border trick
-.byte $55
+.byte $00
 
 MAINLOOP_COUNT:   .byte 0
 
