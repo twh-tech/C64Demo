@@ -1,4 +1,5 @@
 .var SID_ENABLED = 0
+SID_FRAMES_LEFT:  .word 5200	// This is for the SID tune Ark Pandora
 
 .macro UpdateSidPlayerArkPandora() {
     .if (SID_ENABLED == 1) {

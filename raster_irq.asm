@@ -14,16 +14,63 @@
 //.label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
 .label PHASE2_RASTER = 50 
 .label PHASE3_SIZE     = 37
-.label RASTER_STATE_TOP_ACTIVE    = 0
-.label RASTER_STATE_BOTTOM_ACTIVE = 1
+.label RASTER_STATE_TOP_ACTIVE    = 1
+.label RASTER_STATE_BOTTOM_ACTIVE = 0
 
+// ----------
+// Subroutine
+// ----------
+INIT_VIC_AND_IRQ:
+        sei
+
+        // Clear pending VIC IRQ flags
+        lda     #$ff
+        sta     VICIRQFLAG
+        
+        // Clear high raster bit, enable display
+        lda     VICICR
+        and     #$7f
+        sta     VICICR
+        lda     #DISPLAYON
+        sta     VICICR
+        
+        // Disable CIA1 timer IRQ entirely
+        lda     #$7f
+        sta     $dc0d
+        lda     $dc0d
+        
+        // Disable all CIA2 NMI sources
+        lda     #$7f
+        sta     $dd0d
+        lda     $dd0d
+        
+        // Point IRQ and NMI vectors
+        lda     #<IRQ1
+        sta     $fffe
+        lda     #>IRQ1
+        sta     $ffff
+        lda     #<DUMMY_NMI
+        sta     $fffa
+        lda     #>DUMMY_NMI
+        sta     $fffb
+        // Enable VIC raster IRQ
+        lda     #$01
+        sta     VICIRQENABLE
+
+		SetRasterStateTopActive()
+
+        cli
+        rts
+
+// ----------------
+// Raster Interrupt
+// ----------------
 IRQ1:
         lda     VICIRQFLAG
         and     #$01
-        bne     IS_RASTER
+        bne     !is_raster+
         rti
-
-IS_RASTER:
+!is_raster:
         lda     #$01
         sta     VICIRQFLAG
 		nops(12)
@@ -52,7 +99,7 @@ PHASE2_ENTRY_SKIP:
 PHASE2_ENTRY:
         ldy     #25
 
-PHASE2_GROUP:
+PHASE2_N0:
         lda     COLORTABLE,x
         sta     VICBORDER
         sta     VICBGCOLOR
@@ -119,7 +166,7 @@ PHASE2_N7:
         inx
         dey
         beq     PHASE2_N7_DONE
-        jmp     PHASE2_GROUP
+        jmp     PHASE2_N0
 PHASE2_N7_DONE:
         nop
         jmp     PHASE3_JMP
@@ -174,14 +221,15 @@ OFFSCREEN_WORK:
         
         SaveMainloopMeasurement()
         
-        jsr		DORASTERBARS
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
-        jsr     MOVESPRITES
+        //jsr		DORASTERBARS
+        //jsr     DOSCROLL
+        //jsr     UPDATESPEED
+        //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
-
-        ActivateBottomIfBarEntersBottom()
+     	
+        // running when bottom active, watch for bar entering top
+        ActivateTopIfBarEntersTop()
         
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
@@ -199,14 +247,15 @@ OFFSCREEN_WORK_SKIP:
         sta     VICBGCOLOR
         
         SaveMainloopMeasurement()
-		jsr		DORASTERBARS
-        jsr     DOSCROLL
-        jsr     UPDATESPEED
-        jsr     MOVESPRITES
+		//jsr		DORASTERBARS
+        //jsr     DOSCROLL
+        //jsr     UPDATESPEED
+        //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
-
-		ActivateTopIfBarEntersTop()
+		
+		// running when top active, watch for bar entering bottom
+		ActivateBottomIfBarEntersBottom()
 
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
@@ -217,7 +266,7 @@ OFFSCREEN_WORK_SKIP:
 // ------
 // MACROS
 // ------
-.macro SetRasterStateTopActive() {
+.macro SetRasterStateBottomActive() {
         lda     #PHASE2_RASTER
         sta     VICRASTER
         lda     #<PHASE2_ENTRY_SKIP
@@ -228,11 +277,11 @@ OFFSCREEN_WORK_SKIP:
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
         sta     PHASE3_JMP+2
-        lda     #RASTER_STATE_TOP_ACTIVE
+        lda     #RASTER_STATE_BOTTOM_ACTIVE
         sta     RASTER_STATE
 }
 
-.macro SetRasterStateBottomActive() {
+.macro SetRasterStateTopActive() {
         lda     #PHASE1_RASTER
         sta     VICRASTER
         lda     #<PHASE1_ACTIVE
@@ -243,7 +292,7 @@ OFFSCREEN_WORK_SKIP:
         sta     PHASE3_JMP+1
         lda     #>OFFSCREEN_WORK_SKIP
         sta     PHASE3_JMP+2
-        lda     #RASTER_STATE_BOTTOM_ACTIVE
+        lda     #RASTER_STATE_TOP_ACTIVE
         sta     RASTER_STATE
 }
 
@@ -252,11 +301,10 @@ OFFSCREEN_WORK_SKIP:
         cmp     #RASTER_STATE_TOP_ACTIVE
         beq     !skip+
         lda     BAR_YPOS_HI
-        bne     !switch+
+        bne     !skip+                    // HI=1 means bar is in bottom area, skip
         lda     BAR_YPOS
-        cmp     #PHASE3_START_IDX - (BAR_HEIGHT - 1)
-        bcc     !skip+
-!switch:
+        cmp     #BARTABLE_OFFSET
+        bcs     !skip+                    // bar not yet in top area, skip
         SetRasterStateTopActive()
 !skip:
 }
@@ -266,10 +314,11 @@ OFFSCREEN_WORK_SKIP:
         cmp     #RASTER_STATE_BOTTOM_ACTIVE
         beq     !skip+
         lda     BAR_YPOS_HI
-        bne     !skip+
+        bne     !switch+
         lda     BAR_YPOS
-        cmp     #BARTABLE_OFFSET
-        bcs     !skip+
+        cmp     #PHASE3_START_IDX - (BAR_HEIGHT - 1)
+        bcc     !skip+
+!switch:
         SetRasterStateBottomActive()
 !skip:
 }

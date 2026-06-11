@@ -5,55 +5,20 @@ BasicStub()
 START:
 		// This is for measuring how many cycles spent in MAINLOOP
 		jsr		INIT_MEASUREMENT
-
-        lda     #$35		
-        sta     $01             // RAM under BASIC+KERNAL, I/O still visible
-
-		InitSidPlayerArkPandora()
-
-//        jsr     SETUPSPRITES
-        
-        sei
-        // Clear pending VIC IRQ flags
-        lda     #$ff
-        sta     VICIRQFLAG
-
-        // VIC control: clear high raster bit, enable display
-        lda     VICICR
-        and     #$7f
-        sta     VICICR
-        lda     #DISPLAYON
-        sta     VICICR
-
-        // Disable CIA1 timer IRQ entirely
-        lda     #$7f
-        sta     $dc0d
-        lda     $dc0d
-
-        lda     #$7f
-        sta     $dd0d       // disable all CIA2 NMI sources
-        lda     $dd0d       // acknowledge any pending NMI
-
-        lda     #<IRQ1
-        sta     $fffe
-        lda     #>IRQ1
-        sta     $ffff
-
-        lda     #<DUMMY_NMI
-        sta     $fffa
-        lda     #>DUMMY_NMI
-        sta     $fffb
-
-        // Enable VIC raster IRQ
-        lda     #$01
-        sta     VICIRQENABLE
-
-		SetRasterStateTopActive()
-
 		jsr		CLEARSCREEN
 		jsr		CLEARCOLORRAM
 		jsr		INITSCROLL
-        cli
+		
+		// Bank switching: RAM visible at $A000-$BFFF and $E000-$FFFF
+        // instead of BASIC ROM and KERNAL ROM.
+        // I/O registers ($D000-$DFFF) remain visible.
+		lda     #$35
+        sta     $01
+
+		InitSidPlayerArkPandora()
+
+        jsr     SETUPSPRITES
+        jsr		INIT_VIC_AND_IRQ
 
 MAINLOOP:
         inc MAINLOOP_COUNT	// 6 cycles 
@@ -69,11 +34,7 @@ RASTER_STATE:
 //.byte $55    // garbagebyte - must stay $00 for open border trick
 .byte $00
 
-SID_FRAMES_LEFT:  .word 5200
 MAINLOOP_COUNT:   .byte 0
-
-* = $5000 "Measurement buffer"
-.fill $2000, 0
 
 #import "print_address_labels.asm"
 #import "helpers.asm"
