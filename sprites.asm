@@ -88,6 +88,7 @@ SETUPSPRITES:
         // Enable sprite 0
 //        lda     #%11111111
         lda     #%00011000
+        lda     #%00001000
         sta     $d015
 		rts
 

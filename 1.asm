@@ -1,3 +1,4 @@
+// demo.asm
 BasicStub()
 
 .label MAINLOOP_PTR    = $f7    // 2 bytes on zero page: $f7 (lo), $f8 (hi)
@@ -17,7 +18,7 @@ START:
 
 		InitSidPlayerArkPandora()
 
-      //  jsr     SETUPSPRITES
+        jsr     SETUPSPRITES
         jsr		INIT_VIC_AND_IRQ
 
 MAINLOOP:
@@ -32,7 +33,7 @@ RASTER_STATE:
 
 * = $3FFF "Garbagebyte"
 //.byte $55    // garbagebyte - must stay $00 for open border trick
-.byte $00
+.byte $55
 
 MAINLOOP_COUNT:   .byte 0
 

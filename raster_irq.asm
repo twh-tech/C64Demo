@@ -1,3 +1,4 @@
+// raster_irq.asm
 .label TABLESTART      = 16
 .label TABLEND         = 288
 .label TABLESIZE       = TABLEND - TABLESTART
@@ -16,6 +17,7 @@
 .label PHASE3_SIZE     = 37
 .label RASTER_STATE_TOP_ACTIVE    = 1
 .label RASTER_STATE_BOTTOM_ACTIVE = 0
+.label RASTER_STATE_BOTH_ACTIVE   = 2
 
 // ----------
 // Subroutine
@@ -58,7 +60,8 @@ INIT_VIC_AND_IRQ:
         sta     VICIRQENABLE
 
 //		SetRasterStateBottomActive()
-		SetRasterStateTopActive()
+//		SetRasterStateTopActive()
+		SetRasterStateBothActive()
         cli
         rts
 
@@ -219,21 +222,20 @@ PHASE3_LOOP_B:
         bne     PHASE3_LOOP_B
 
 
-// -------------------------------------------------------
-        // OFFSCREEN_WORK: runs after Phase3 (bottom border raster bars).
-        // Phase1 (top border) is skipped this frame.
+		// -------------------------------------------------------
+        // Runs directly after Phase3 (bottom border raster bars).
         // -------------------------------------------------------
-OFFSCREEN_WORK:
-        lda     #$00
+OFFSCREEN_WORK_AFTER_PHASE3:
+        lda     #$01
         sta     VICBORDER
         sta     VICBGCOLOR
         
         SaveMainloopMeasurement()
         
         //jsr		DORASTERBARS
-        //jsr     DOSCROLL
-        //jsr     UPDATESPEED
-        //jsr     MOVESPRITES
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
+        jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
      	
@@ -246,12 +248,12 @@ OFFSCREEN_WORK:
         sta     VICICR
         rti
 
-        // -------------------------------------------------------
-        // OFFSCREEN_WORK_SKIP: runs after Phase1 (top border raster bars).
+        // ---------------------------------------------
+        // Runs after Phase2
         // Phase3 (bottom border) is skipped this frame.
-        // -------------------------------------------------------
-OFFSCREEN_WORK_SKIP:
-        lda     #$00
+        // ---------------------------------------------
+OFFSCREEN_WORK_AFTER_PHASE2:
+        lda     #$01
         sta     VICBORDER
         sta     VICBGCOLOR
         
@@ -259,7 +261,7 @@ OFFSCREEN_WORK_SKIP:
 		//jsr		DORASTERBARS
         //jsr     DOSCROLL
         //jsr     UPDATESPEED
-        //jsr     MOVESPRITES
+        jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
 		
@@ -297,11 +299,26 @@ OFFSCREEN_WORK_SKIP:
         sta     IRQHANDLER+1
         lda     #>PHASE1_ACTIVE
         sta     IRQHANDLER+2
-        lda     #<OFFSCREEN_WORK_SKIP
+        lda     #<OFFSCREEN_WORK_AFTER_PHASE2
         sta     PHASE3_JMP+1
-        lda     #>OFFSCREEN_WORK_SKIP
+        lda     #>OFFSCREEN_WORK_AFTER_PHASE2
         sta     PHASE3_JMP+2
         lda     #RASTER_STATE_TOP_ACTIVE
+        sta     RASTER_STATE
+}
+
+.macro SetRasterStateBothActive() {
+        lda     #PHASE1_RASTER
+        sta     VICRASTER
+        lda     #<PHASE1_ACTIVE
+        sta     IRQHANDLER+1
+        lda     #>PHASE1_ACTIVE
+        sta     IRQHANDLER+2
+        lda     #<PHASE3_LOOP       // don't skip Phase3
+        sta     PHASE3_JMP+1
+        lda     #>PHASE3_LOOP
+        sta     PHASE3_JMP+2
+        lda     #RASTER_STATE_BOTH_ACTIVE
         sta     RASTER_STATE
 }
 
@@ -309,11 +326,13 @@ OFFSCREEN_WORK_SKIP:
         lda     RASTER_STATE
         cmp     #RASTER_STATE_TOP_ACTIVE
         beq     !skip+
+        cmp     #RASTER_STATE_BOTH_ACTIVE   // add this
+        beq     !skip+                       // add this
         lda     BAR_YPOS_HI
-        bne     !skip+                    // HI=1 means bar is in bottom area, skip
+        bne     !skip+
         lda     BAR_YPOS
         cmp     #BARTABLE_OFFSET
-        bcs     !skip+                    // bar not yet in top area, skip
+        bcs     !skip+
         SetRasterStateTopActive()
 !skip:
 }
@@ -322,6 +341,8 @@ OFFSCREEN_WORK_SKIP:
         lda     RASTER_STATE
         cmp     #RASTER_STATE_BOTTOM_ACTIVE
         beq     !skip+
+        cmp     #RASTER_STATE_BOTH_ACTIVE   // add this
+        beq     !skip+                       // add this
         lda     BAR_YPOS_HI
         bne     !switch+
         lda     BAR_YPOS
