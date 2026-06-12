@@ -1,10 +1,9 @@
 // raster_irq.asm
-.label TABLESTART      = 16
-.label TABLEND         = 288
-.label TABLESIZE       = TABLEND - TABLESTART
-//.label DISPOFF_TOP     = 36
-.label DISPOFF_TOP = 35   // was 36, compensate for TABLESTART moving from 15 to 16
-.label DISPON_LEN      = 200
+.label TABLESTART       = 16
+.label TABLEND          = 288
+.label TABLESIZE        = TABLEND - TABLESTART
+.label DISPOFF_TOP      = 35
+.label DISPON_LEN       = 200
 .label PHASE3_START_IDX = 235 // was 236
 .label COLORTABLE2 = COLORTABLE + 235 // Used in PHASE3_LOOP
 
@@ -22,6 +21,7 @@
 // ----------
 // Subroutine
 // ----------
+* = * "Raster interrupt VIC and irq init"
 INIT_VIC_AND_IRQ:
         sei
 
@@ -68,6 +68,8 @@ INIT_VIC_AND_IRQ:
 // ----------------
 // Raster Interrupt
 // ----------------
+.align 256
+* = * "Raster interrupt code"
 IRQ1:
         lda     VICIRQFLAG
         and     #$01
@@ -76,7 +78,7 @@ IRQ1:
 !is_raster:
         lda     #$01
         sta     VICIRQFLAG
-		nops(12)
+		nops(13)
 IRQHANDLER:
         jmp     PHASE1_ACTIVE
 
@@ -84,23 +86,22 @@ IRQHANDLER:
         // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
-        ldx     #$00
+.for (var i = 0; i < DISPOFF_TOP; i++) {
+        lda     COLORTABLE+i    // 4
+        sta     VICBORDER       // 4
+        sta     VICBGCOLOR      // 4
+        nops(22)				// 44
+        clc                      // 2
+        bcc     *+2              // 3
+        nop //was inx                      // 2	Total = 63
+}
 
-PHASE1_LOOP:
-        lda     COLORTABLE,x
-        sta     VICBORDER
-        sta     VICBGCOLOR
-		nops(22)
-        inx
-        cpx     #DISPOFF_TOP
-        bne     PHASE1_LOOP
-        jmp     PHASE2_ENTRY
 
 PHASE2_ENTRY_SKIP:
-        ldx     #DISPOFF_TOP
+        ldx     #DISPOFF_TOP	// 2
 
 PHASE2_ENTRY:
-        ldy     #25
+        ldy     #25				// 2
 
 PHASE2_N0:
         lda     COLORTABLE,x	// 4
@@ -147,10 +148,11 @@ PHASE2_N5:
         sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
         cpy     #1                  // 2 cycles - check if last iteration
-        beq     PHASE2_PENULTIMATE  // 2 cycles not taken / 3 cycles taken
+        beq     PHASE2_PENULTIMATE  // 2 cycles not taken / 4 cycles taken (page crossing boundary)
         nops(21)					// 42
         inx							// 2
-        bne     PHASE2_N6			// 3	Total = 63 on first 24 iterations - Total = 17 on 25th iteration
+        bne     PHASE2_N6			// 3	Total = 63 on first 24 iterations - Total = 18 on 25th iteration
+        // This last bne is borderlining crossing a page boundary, but it is not doing it
 
 PHASE2_N6:
         lda     COLORTABLE,x	// 4
@@ -175,7 +177,7 @@ PHASE2_PENULTIMATE:
         lda     #$13			// 2
         sta     VICICR			// 3
         nops(19)				// 38
-        inx						// 2	Total = 17 (from PHASE2_N5's last iteration) + 45 = 62
+        inx						// 2	Total = 18 (from PHASE2_N5's last iteration) + 45 = 63
         // -------------------------
         lda     COLORTABLE,x	// 4
         sta     VICBORDER		// 4
@@ -197,26 +199,46 @@ PHASE3_JMP:
         // PHASE3 is split into two loops as the last loop's lda COLORTABLE2,x
         // is crossing a page boundary causing an extra cycle to be used
         // -------------------------------------------------------------------
-.align 256
-PHASE3_LOOP:
-        lda     COLORTABLE2,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(22)				// 44
-        inx						// 2
-        cpx     #20				// 2
-        bne     PHASE3_LOOP		// 3	Total = 63
 
-PHASE3_LOOP_B:
-        lda     COLORTABLE2,x
+PHASE3_LOOP:
+.for (var i = 0; i < 37; i++) {
+        lda     COLORTABLE2+i
         sta     VICBORDER
         sta     VICBGCOLOR
-        nops(19) // was 19
+line_sec0:
+        nop
+        nop
+        nop
+line_sec1:
+        nop
+        nop
+        nop
+line_sec2:
+        nop
+        nop
+        nop
+line_sec3:
+        nop
+        nop
+        nop
+line_sec4:        
+		nop
+		nop
+		nop
+line_sec5:
+		nop
+		nop
+		nop
+line_sec6:
+		nop
+		nop
+		nop
+        
+        nop
         clc
-		bcc *+2
-		inx
-        cpx     #PHASE3_SIZE
-        bne     PHASE3_LOOP_B
+        bcc     *+2
+        inx //nop // was inx
+} // 20+17 =37 raster lines
 
 
 		// -------------------------------------------------------
@@ -256,8 +278,8 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         
         SaveMainloopMeasurement()
 		//jsr		DORASTERBARS
-        //jsr     DOSCROLL
-        //jsr     UPDATESPEED
+        jsr     DOSCROLL
+        jsr     UPDATESPEED
         //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()

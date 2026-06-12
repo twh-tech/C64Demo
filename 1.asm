@@ -1,8 +1,9 @@
 // demo.asm
+
 BasicStub()
 
 .label MAINLOOP_PTR    = $f7    // 2 bytes on zero page: $f7 (lo), $f8 (hi)
-
+* = $0810 "Start"
 START:
 		// This is for measuring how many cycles spent in MAINLOOP
 		jsr		INIT_MEASUREMENT
@@ -18,7 +19,7 @@ START:
 
 		InitSidPlayerArkPandora()
 
-//        jsr     SETUPSPRITES
+        //jsr     SETUPSPRITES
         jsr		INIT_VIC_AND_IRQ
 
 MAINLOOP:

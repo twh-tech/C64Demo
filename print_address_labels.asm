@@ -16,6 +16,7 @@
 .print "SINETABLE = $"+toHexString(SINETABLE)
 .print "COLORTABLE = $"+toHexString(COLORTABLE)
 
+.print "IRQ1 = $"+toHexString(IRQ1)
 .print "PHASE2_N0 = $"+toHexString(PHASE2_N0)
 .print "PHASE2_N1 = $"+toHexString(PHASE2_N1)
 .print "PHASE2_N2 = $"+toHexString(PHASE2_N2)
@@ -27,4 +28,4 @@
 .print "PHASE2_PENULTIMATE = $"+toHexString(PHASE2_PENULTIMATE)
 .print "PHASE2_LAST = $"+toHexString(PHASE2_LAST)
 .print "PHASE3_LOOP = $"+toHexString(PHASE3_LOOP)
-.print "PHASE3_LOOP_B = $"+toHexString(PHASE3_LOOP_B)
+//.print "PHASE3_LOOP_B = $"+toHexString(PHASE3_LOOP_B)

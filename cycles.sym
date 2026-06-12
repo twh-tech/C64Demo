@@ -1,0 +1,6 @@
+.label OVER=$c09f
+.label COL=$c0ae
+.label LOOP0=$c02e
+.label IRQ=$c057
+.label SECOND=$c066
+.label FIRST=$c063
