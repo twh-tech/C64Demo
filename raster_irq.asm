@@ -91,108 +91,121 @@ PHASE1_ACTIVE:
         sta     VICBORDER       // 4
         sta     VICBGCOLOR      // 4
         nops(22)				// 44
-        clc                      // 2
-        bcc     *+2              // 3
-        nop //was inx                      // 2	Total = 63
+        clc                     // 2
+        bcc     *+2             // 3
+        nop                     // 2	Total = 63
 }
 
 
-PHASE2_ENTRY_SKIP:
-        ldx     #DISPOFF_TOP	// 2
-
 PHASE2_ENTRY:
-        ldy     #25				// 2
 
-PHASE2_N0:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4 
-        nops(4)					// 8	Fewer nops here due to bad lines (first raster line in a character row)
-        inx						// 2
-        bne     PHASE2_N1		// 3	Total = 25, bad lines = 40	Total = 65 ? 
+.for (var row = 0; row < 24; row++) {
 
-PHASE2_N1:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        inx						// 2
-        bne     PHASE2_N2		// 3	Total = 63
+    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
+    lda     COLORTABLE + DISPOFF_TOP + row*8	// 4
+    sta     VICBORDER			// 4
+    sta     VICBGCOLOR			// 4
+    nops(4)						// 6
+//    clc							// 2
+//    bcc     *+2					// 3	// total = 23 (+40 stolen = 63)
 
-PHASE2_N2:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        inx						// 2
-        bne     PHASE2_N3		// 3	Total = 63
+    // --- Remaining 7 normal lines of this row ---
+    .for (var line = 1; line < 8; line++) {
+        lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4
+        sta     VICBORDER				// 4
+        sta     VICBGCOLOR				// 4
+PAD0:   nops(3)					// 6
+PAD1:   nops(3)					// 6
+PAD2:   nops(3)					// 6
+PAD3:   nops(3)					// 6
+PAD4:   nops(3)					// 6
+PAD5:   nops(3)					// 6
+PAD6:   nops(3)					// 6
+        nop						// 2
+        nop						// 2
+        clc						// 2
+        bcc     *+2				// 3	total = 63
+    }
+}
 
-PHASE2_N3:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        inx						// 2
-        bne     PHASE2_N4		// 3	Total = 63
+// =========================================================
+// Row 24 — special last row: 1 bad line, 4 normal lines, open-border line, 2 normal lines
+// =========================================================
 
-PHASE2_N4:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        inx						// 2
-        bne     PHASE2_N5		// 3	Total = 63
+    // 1st raster line in 25th text row is a Bad line, 40 cycles stolen, 23 remain
+    lda     COLORTABLE + DISPOFF_TOP + 24*8	// 4
+    sta     VICBORDER			// 4
+    sta     VICBGCOLOR			// 4
+    nops(4)						// 8
 
-PHASE2_N5:
-        lda     COLORTABLE,x		// 4
+.for (var line = 1; line < 5; line++) {
+    lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
+    sta     VICBORDER	// 4
+    sta     VICBGCOLOR	// 4
+PAD0:   nops(3)			// 6
+PAD1:   nops(3)			// 6
+PAD2:   nops(3)			// 6
+PAD3:   nops(3)			// 6
+PAD4:   nops(3)			// 6
+PAD5:   nops(3)			// 6
+PAD6:   nops(3)			// 6
+        nop				// 2
+        nop				// 2
+        clc				// 2
+        bcc     *+2     // 3	total = 63
+}
+
+// --- Third-last line: open border trick ---
+PHASE2_OPENBORDER:
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
+        sta     VICBORDER	// 4
+        sta     VICBGCOLOR	// 4
+        lda     #$13		// 2
+        sta     VICICR		// 4
+OB_PAD0: nops(3)	// 6
+OB_PAD1: nops(3)	// 6
+OB_PAD2: nops(3)	// 6
+OB_PAD3: nops(3)	// 6
+OB_PAD4: nops(3)	// 6
+OB_PAD5: nops(3)	// 6
+OB_PAD6: nops(5)	// 6
+        //bit     $02	// 3	total = 63
+
+// --- Penultimate line: normal ---
+PHASE2_PENULTIMATE:
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+6
+        sta     VICBORDER
+        sta     VICBGCOLOR
+PU_PAD0: nops(3)
+PU_PAD1: nops(3)
+PU_PAD2: nops(3)
+PU_PAD3: nops(3)
+PU_PAD4: nops(3)
+PU_PAD5: nops(3)
+PU_PAD6: nops(3)
+        nop
+        clc
+        bcc     *+2
+        nop                 // total = 63
+
+// --- Last line: normal ---
+PHASE2_LAST:
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
         sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
-        cpy     #1                  // 2 cycles - check if last iteration
-        beq     PHASE2_PENULTIMATE  // 2 cycles not taken / 4 cycles taken (page crossing boundary)
-        nops(21)					// 42
-        inx							// 2
-        bne     PHASE2_N6			// 3	Total = 63 on first 24 iterations - Total = 18 on 25th iteration
-        // This last bne is borderlining crossing a page boundary, but it is not doing it
-
-PHASE2_N6:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        inx						// 2
-        bne     PHASE2_N7		// 3	Total = 63 
-
-
-PHASE2_N7:
-        lda     COLORTABLE,x	// 4 
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(19)				// 38
-        inx						// 2
-        dey						// 2
-        nop						// 2
-        jmp     PHASE2_N0		// 3	Total = 59
-
-PHASE2_PENULTIMATE:
-        lda     #$13			// 2
-        sta     VICICR			// 3
-        nops(19)				// 38
-        inx						// 2	Total = 18 (from PHASE2_N5's last iteration) + 45 = 63
-        // -------------------------
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        inx						// 2
-        nops(22)				// 44	Total = 58
-
-PHASE2_LAST:
-        lda     COLORTABLE,x	// 4
-        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        nops(23)				// 46
-        ldx		#$00			// 2             Reset x, as PHASE3_LOOP that comes next use COLORTABLE2 instead of COLORTABLE - This is to prevent wrap around of X
-PHASE3_JMP:
-        jmp     PHASE3_LOOP		// 3	Total = 63
+LA_PAD0: nops(3)					// 6
+LA_PAD1: nops(3)					// 6
+LA_PAD2: nops(3)					// 6
+LA_PAD3: nops(3)					// 6
+LA_PAD4: nops(3)					// 6
+LA_PAD5: nops(3)					// 6
+LA_PAD6: nops(3)					// 6
+        nop							// 2
+//        nop							// 2
+        clc							// 2
+        bcc     *+2					// 3
+PHASE3_JMP:        
+        jmp     PHASE3_LOOP			// 3	Total = 63
 
         // -------------------------------------------------------------------
         // PHASE3: raster bars for main display area
@@ -299,9 +312,9 @@ OFFSCREEN_WORK_AFTER_PHASE2:
 .macro SetRasterStateBottomActive() {
         lda     #PHASE2_RASTER
         sta     VICRASTER
-        lda     #<PHASE2_ENTRY_SKIP
+        lda     #<PHASE2_ENTRY        // was PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+1
-        lda     #>PHASE2_ENTRY_SKIP
+        lda     #>PHASE2_ENTRY        // was PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+2
         lda     #<PHASE3_LOOP
         sta     PHASE3_JMP+1
