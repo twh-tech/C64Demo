@@ -1,0 +1,9 @@
+.label VICRASTER=$d012
+.label VICBORDER=$d020
+.label VICBGCOLOR=$d021
+.label VICMEMCTRL=$d018
+.label VICIRQENABLE=$d01a
+.label DISPLAYON=$1b
+.label VICICR=$d011
+.label VICIRQFLAG=$d019
+.label VICXSCROLL=$d016

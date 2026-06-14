@@ -86,45 +86,63 @@ IRQHANDLER:
         // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
-.for (var i = 0; i < DISPOFF_TOP; i++) {
-        lda     COLORTABLE+i    // 4
-        sta     VICBORDER       // 4
-        sta     VICBGCOLOR      // 4
-        nops(22)				// 44
-        clc                     // 2
-        bcc     *+2             // 3
-        nop                     // 2	Total = 63
+.for (var i = 0; i < 13; i++) {
+        lda     COLORTABLE+i
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        nops(22)
+        clc
+        bcc     *+2
+        nop
+}
+.for (var i = 13; i < 34; i++) {
+        lda     COLORTABLE+i
+		//lda		#$00
+		//lda		#$00        
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        nops(11)
+        bit     $eaea
+        bit     $eaea
+        bit     $eaea
+        bit     $eaea
+        nop
+}
+.for (var i = 34; i < DISPOFF_TOP; i++) {
+        lda     COLORTABLE+i
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        nops(22)
+        clc
+        bcc     *+2
+        nop
 }
 
 
 PHASE2_ENTRY:
-
 .for (var row = 0; row < 24; row++) {
+	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
+	    lda     COLORTABLE + DISPOFF_TOP + row*8	// 4
+	    sta     VICBORDER			// 4
+	    sta     VICBGCOLOR			// 4
+PAD0:	nops(3)						// 6
+    	nop							// 2	Total = 20 (+40 stolen = 60)
 
-    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
-    lda     COLORTABLE + DISPOFF_TOP + row*8	// 4
-    sta     VICBORDER			// 4
-    sta     VICBGCOLOR			// 4
-    nops(4)						// 6
-//    clc							// 2
-//    bcc     *+2					// 3	// total = 23 (+40 stolen = 63)
 
     // --- Remaining 7 normal lines of this row ---
     .for (var line = 1; line < 8; line++) {
         lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4
         sta     VICBORDER				// 4
         sta     VICBGCOLOR				// 4
-PAD0:   nops(3)					// 6
-PAD1:   nops(3)					// 6
-PAD2:   nops(3)					// 6
-PAD3:   nops(3)					// 6
-PAD4:   nops(3)					// 6
-PAD5:   nops(3)					// 6
-PAD6:   nops(3)					// 6
-        nop						// 2
-        nop						// 2
-        clc						// 2
-        bcc     *+2				// 3	total = 63
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)						// 2
+        bit $02//bcc     *+2				// 3	total = 63
     }
 }
 
@@ -141,18 +159,18 @@ PAD6:   nops(3)					// 6
 .for (var line = 1; line < 5; line++) {
     lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
     sta     VICBORDER	// 4
-    sta     VICBGCOLOR	// 4
-PAD0:   nops(3)			// 6
-PAD1:   nops(3)			// 6
-PAD2:   nops(3)			// 6
-PAD3:   nops(3)			// 6
-PAD4:   nops(3)			// 6
-PAD5:   nops(3)			// 6
-PAD6:   nops(3)			// 6
-        nop				// 2
-        nop				// 2
-        clc				// 2
-        bcc     *+2     // 3	total = 63
+	sta     VICBGCOLOR	// 4
+	nops(3)			// 6
+	nops(3)			// 6
+	nops(3)			// 6
+	nops(3)			// 6
+	nops(3)			// 6
+	nops(3)			// 6
+	nops(3)			// 6
+    nop				// 2
+    nop				// 2
+    clc				// 2
+    bcc     *+2     // 3	total = 63
 }
 
 // --- Third-last line: open border trick ---
@@ -162,13 +180,13 @@ PHASE2_OPENBORDER:
         sta     VICBGCOLOR	// 4
         lda     #$13		// 2
         sta     VICICR		// 4
-OB_PAD0: nops(3)	// 6
-OB_PAD1: nops(3)	// 6
-OB_PAD2: nops(3)	// 6
-OB_PAD3: nops(3)	// 6
-OB_PAD4: nops(3)	// 6
-OB_PAD5: nops(3)	// 6
-OB_PAD6: nops(5)	// 6
+		nops(3)	// 6
+		nops(3)	// 6
+		nops(3)	// 6
+		nops(3)	// 6
+		nops(3)	// 6
+		nops(3)	// 6
+		nops(5)	// 6
         //bit     $02	// 3	total = 63
 
 // --- Penultimate line: normal ---
@@ -176,13 +194,13 @@ PHASE2_PENULTIMATE:
         lda     COLORTABLE + DISPOFF_TOP + 24*8+6
         sta     VICBORDER
         sta     VICBGCOLOR
-PU_PAD0: nops(3)
-PU_PAD1: nops(3)
-PU_PAD2: nops(3)
-PU_PAD3: nops(3)
-PU_PAD4: nops(3)
-PU_PAD5: nops(3)
-PU_PAD6: nops(3)
+		nops(3) // bit $eaea	//
+		nops(3)
+		nops(3)
+		nops(3)
+		nops(3)
+		nops(3)
+		nops(3)
         nop
         clc
         bcc     *+2
@@ -193,13 +211,13 @@ PHASE2_LAST:
         lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
         sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
-LA_PAD0: nops(3)					// 6
-LA_PAD1: nops(3)					// 6
-LA_PAD2: nops(3)					// 6
-LA_PAD3: nops(3)					// 6
-LA_PAD4: nops(3)					// 6
-LA_PAD5: nops(3)					// 6
-LA_PAD6: nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
         nop							// 2
 //        nop							// 2
         clc							// 2
@@ -218,39 +236,16 @@ PHASE3_LOOP:
         lda     COLORTABLE2+i
         sta     VICBORDER
         sta     VICBGCOLOR
-line_sec0:
-        nop
-        nop
-        nop
-line_sec1:
-        nop
-        nop
-        nop
-line_sec2:
-        nop
-        nop
-        nop
-line_sec3:
-        nop
-        nop
-        nop
-line_sec4:        
-		nop
-		nop
-		nop
-line_sec5:
-		nop
-		nop
-		nop
-line_sec6:
-		nop
-		nop
-		nop
-        
-        nop
-        clc
-        bcc     *+2
-        inx //nop // was inx
+        nops(3)
+        nops(3)
+        nops(3)
+        nops(3)
+        nops(3)
+        nops(3)
+        nops(3)
+        nops(3)
+        bit		$02
+
 } // 20+17 =37 raster lines
 
 
@@ -273,6 +268,8 @@ OFFSCREEN_WORK_AFTER_PHASE3:
      	
         // running when bottom active, watch for bar entering top
         ActivateTopIfBarEntersTop()
+        
+        //inc		$d001
         
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)

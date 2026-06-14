@@ -76,12 +76,17 @@ SETUPSPRITES:
         //lda		#$ff
         //lda		#$17
 		//lda		#$fc
-		lda		#$fe                
+		
+		//lda		#$fe
+		lda		#$b0                
         sta     $d001
+        sta     $d003  
+        lda		#$1c
+        sta     $d001        
         sta     $d003  
         sta     $d005
         sta     $d007  
-        lda		#$17
+        
         sta     $d009
         sta     $d00b  
         sta     $d00d
@@ -91,7 +96,7 @@ SETUPSPRITES:
 //        lda     #%11111111
         lda     #%00011000
         lda     #%00001000
-        lda     #%00000001
+        lda     #%00001111
         sta     $d015
 		rts
 
