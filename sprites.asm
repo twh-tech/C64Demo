@@ -92,12 +92,9 @@ SETUPSPRITES:
         sta     $d00d
         sta     $d00f  
 
-        // Enable sprite 0
-//        lda     #%11111111
-        lda     #%00011000
-        lda     #%00001000
+        // Enable sprite(s)
         lda     #%00001111
-        sta     $d015
+        //sta     $d015
 		rts
 
 MOVESPRITES:
