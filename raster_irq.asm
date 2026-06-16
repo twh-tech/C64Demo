@@ -106,10 +106,16 @@ PHASE1_ACTIVE:
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
 
+		// no sprites
+        nops(23)				// 46
+        clc						// 2
+        bcc     *+2				// 3	Total = 63
 
+/*		// sprites visible
 		nops(18) //was23
 		clc
 		bcc		*+2
+*/
 	// nops(19) compensates for the bottom 4 sprites
         //nops(19)
 
@@ -140,6 +146,7 @@ PHASE2_ENTRY:
 	    stx     VICBGCOLOR			// 4
 		nops(3)						// 6
 		nops(3)						// 6	Total = 20 (+40 stolen = 60)
+
 
 
     // --- Next 6 raster lines are normal lines of this row ---
@@ -182,8 +189,8 @@ PHASE2_ENTRY:
     stx     VICBGCOLOR			// 4
     nops(3)						// 6
     nops(3)						// 6
-    clc							// 2
-    bcc		*+2					// 3	Total = 25 (+40 stolen = 65) 
+//    clc							// 2
+//    bcc		*+2					// 3	Total = 23 (+40 stolen = 63) 
 
 .for (var line = 1; line < 5; line++) {
     sta     VICBORDER	// 4
@@ -215,35 +222,35 @@ PHASE2_OPENBORDER:
 		nops(3)	// 6
 		nops(3)	// 6
 		nops(3)	// 6
-		nops(5)	// 6
+		nop	// 2
+		clc
+		bcc		*+2
+		lda		#$00	
+
         //bit     $02	// 3	total = 63
 
 // --- Penultimate line: normal ---
 PHASE2_PENULTIMATE:
-        sta     VICBORDER
-        sta     VICBGCOLOR
-        lda     COLORTABLE + DISPOFF_TOP + 24*8+6+1
-		nops(3) // bit $eaea	//
-		nops(3)
-		nops(3)
-        nop
-        clc
-        bcc     *+2
-        nop                 // total = 63
-		nops(4)
-		//nops(4)
-		nops(5)
-        sta     VICBORDER			// 4
-        //sta     VICBGCOLOR			// 4
-		
+        sta     VICBORDER							// 4
+        sta     VICBGCOLOR							// 4
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+6+1	// 4
+		nops(3) // 6
+		nops(3) // 6
+		nops(3) // 6
+		nops(3) // 6
+		nops(3) // 6
+		nops(3) // 6
+		nops(3) // 6
+		//nops(3) // 6
+		clc
+		bcc		*+2
+        nop		// 2
+        nop		// 2	Total = 64 
 
 // --- Last line: normal ---
 PHASE2_LAST:
-//        sta     VICBORDER			// 4
+        sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
-		nops(3)
-        //lda		#$00
-        //lda		#$00
         lda     COLORTABLE + DISPOFF_TOP + 25*8	// 4
 		nops(3)					// 6
 		nops(3)					// 6
@@ -252,12 +259,11 @@ PHASE2_LAST:
 		nops(3)					// 6
 		nops(3)					// 6
 		nops(3)					// 6
-        nop							// 2
-//        nop							// 2
-        clc							// 2
-        bcc     *+2					// 3
+		nops(3)					// 6
+//        clc						// 2
+//        bcc     *+2				// 3
 PHASE3_JMP:        
-        jmp     PHASE3_LOOP			// 3	Total = 63
+        jmp     PHASE3_LOOP		// 3	Total = 62
 
         // -------------------------------------------------------------------
         // PHASE3: raster bars for bottom border area
@@ -293,7 +299,7 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         
         //jsr		DORASTERBARS
         jsr     DOSCROLL
-        jsr     UPDATESPEED
+        //jsr     UPDATESPEED
         //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()
@@ -325,7 +331,7 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         SaveMainloopMeasurement()
 		//jsr		DORASTERBARS
         jsr     DOSCROLL
-        jsr     UPDATESPEED
+        //jsr     UPDATESPEED
         //jsr     MOVESPRITES
         
         //UpdateSidPlayerArkPandora()

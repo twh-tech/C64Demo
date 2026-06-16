@@ -103,7 +103,7 @@ SETUPSPRITES:
 
         // Enable sprite(s)
         lda     #%10000010
-        sta     $d015
+//        sta     $d015
 		rts
 
 MOVESPRITES:
