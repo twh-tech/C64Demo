@@ -78,13 +78,11 @@ IRQ1:
 !is_raster:
         lda     #$01
         sta     VICIRQFLAG
-		nops(11) // was11
+		nops(13)
 		//clc
 		//bcc		*+2
 		lda		COLORTABLE	// This is the first color value pre-loaded for Phase1
 							// I guess it needs to be different if Phase1 is skipped
-		nop		// delay compensating for the moved lda in the start of each raster line
-		nop
 IRQHANDLER:
         jmp     PHASE1_ACTIVE
 
@@ -92,57 +90,60 @@ IRQHANDLER:
         // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
-.for (var i = 0; i < 13; i++) {
-        sta     VICBORDER
-        sta     VICBGCOLOR
-		lda     COLORTABLE+i+1
+.for (var i = 0; i < 12; i++) {
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+		lda     COLORTABLE+i+1	// 4
 
-        nops(22)
-        clc
-        bcc     *+2
-        nop
+        nops(23)				// 46
+        clc						// 2
+        bcc     *+2				// 3	Total = 63
 }
-.for (var i = 13; i < 34; i++) {
-		//lda		#$00
-		//lda		#$00        
+
+// This is the sprite-compensation raster lines for test.
+.for (var i = 12; i < 33; i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
-		nops(23)
+
+
+		nops(18) //was23
 		clc
 		bcc		*+2
+	// nops(19) compensates for the bottom 4 sprites
+        //nops(19)
 
-/*	// This compensates for the bottom 4 sprites
-        nops(12)
-        bit     $eaea
-		bit     $eaea
-        bit     $eaea
-        bit     $eaea
-*/
 }
-.for (var i = 34; i < DISPOFF_TOP; i++) {
+.for (var i = 33; i < (DISPOFF_TOP-1); i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
-        nops(22)
+        nops(23)
         clc
         bcc     *+2
-        nop
 }
+		// This is the last rasterline in Phase1 before the screen area
+        sta     VICBORDER
+        sta     VICBGCOLOR
+        lda     COLORTABLE+34+2	// this is used in the raster line after the next raster line
+        ldx		COLORTABLE+34+1 // this is for the next raster line
+        nops(21)
+        clc
+        bcc     *+2
+
 
 
 PHASE2_ENTRY:
 .for (var row = 0; row < 24; row++) {
 	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
-	    sta     VICBORDER			// 4
-	    sta     VICBGCOLOR			// 4
-	    lda     COLORTABLE + DISPOFF_TOP + row*8+1	// 4
+	    stx     VICBORDER			// 4
+	    stx     VICBGCOLOR			// 4
 		nops(3)						// 6
-    	nop							// 2	Total = 20 (+40 stolen = 60)
+		nops(3)						// 6	Total = 20 (+40 stolen = 60)
 
 
-    // --- Remaining 7 normal lines of this row ---
-    .for (var line = 1; line < 8; line++) {
+    // --- Next 6 raster lines are normal lines of this row ---
+    .for (var line = 1; line < 7; line++) {
         sta     VICBORDER				// 4
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+line+1	// 4
@@ -156,6 +157,20 @@ PHASE2_ENTRY:
 		nops(3)						// 2
         bit $02//bcc     *+2				// 3	total = 63
     }
+    	// This is the last raster line in each of the 25 character rows
+        sta     VICBORDER				// 4
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + row*8+7+2	// 4
+        ldx		COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
+		nop
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)					// 6
+		nops(3)						// 2
+        bit $02//bcc     *+2				// 3	total = 63
 }
 
 // =========================================================
@@ -163,10 +178,12 @@ PHASE2_ENTRY:
 // =========================================================
 
     // 1st raster line in 25th text row is a Bad line, 40 cycles stolen, 23 remain
-    sta     VICBORDER			// 4
-    sta     VICBGCOLOR			// 4
-    lda     COLORTABLE + DISPOFF_TOP + 24*8+1	// 4
-    nops(4)						// 8
+    stx     VICBORDER			// 4
+    stx     VICBGCOLOR			// 4
+    nops(3)						// 6
+    nops(3)						// 6
+    clc							// 2
+    bcc		*+2					// 3	Total = 25 (+40 stolen = 65) 
 
 .for (var line = 1; line < 5; line++) {
     sta     VICBORDER	// 4
@@ -209,19 +226,22 @@ PHASE2_PENULTIMATE:
 		nops(3) // bit $eaea	//
 		nops(3)
 		nops(3)
-		nops(3)
-		nops(3)
-		nops(3)
-		nops(3)
         nop
         clc
         bcc     *+2
         nop                 // total = 63
+		nops(4)
+		//nops(4)
+		nops(5)
+        sta     VICBORDER			// 4
+        //sta     VICBGCOLOR			// 4
+		
 
 // --- Last line: normal ---
 PHASE2_LAST:
-        sta     VICBORDER			// 4
+//        sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
+		nops(3)
         //lda		#$00
         //lda		#$00
         lda     COLORTABLE + DISPOFF_TOP + 25*8	// 4

@@ -1,2 +1,2 @@
 .label SETUPSPRITES=$2000
-.label MOVESPRITES=$20b3
+.label MOVESPRITES=$20af

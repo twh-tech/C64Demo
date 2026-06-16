@@ -12,7 +12,16 @@ SETUPSPRITES:
         lda     #$00
         sta     $3840
 
+
+
+.const SPRITE_BASE = $0900
+
+.for (var i = 0; i < 8; i++) {
+    lda #(SPRITE_BASE/64) + i
+    sta $07F8 + i
+}
         // Point sprite 0 to $3800
+/*
         lda     #$e0
         sta     $07f8
 		sta     $07f9           // sprite 1 pointer
@@ -22,7 +31,7 @@ SETUPSPRITES:
 		sta     $07fd           // sprite 1 pointer
         sta     $07fe
 		sta     $07ff           // sprite 1 pointer
-
+*/
         // Sprite color: light blue = $0e
         lda     #$01
         sta     $d027
@@ -81,7 +90,7 @@ SETUPSPRITES:
 		lda		#$b0                
         sta     $d001
         sta     $d003  
-        lda		#$1c
+        lda		#$1b
         sta     $d001        
         sta     $d003  
         sta     $d005
@@ -93,8 +102,8 @@ SETUPSPRITES:
         sta     $d00f  
 
         // Enable sprite(s)
-        lda     #%00001111
-        //sta     $d015
+        lda     #%10000010
+        sta     $d015
 		rts
 
 MOVESPRITES:

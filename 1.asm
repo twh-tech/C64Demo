@@ -48,6 +48,7 @@ MAINLOOP_COUNT:   .byte 0
 #import "vic_registers.asm"
 #import "main_loop_measurement.asm"
 #import "sid_player.asm"
+#import "sprite_data.asm"
 //* = $1800 "SID Player - Bombo"
 //.import binary "bombo.sid", 126
 //* = $a000
