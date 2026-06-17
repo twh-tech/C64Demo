@@ -8,7 +8,7 @@
 .label COLORTABLE2 = COLORTABLE + 235 // Used in PHASE3_LOOP
 
 // Raster line where PHASE1 starts (IRQ trigger when PHASE1 active)
-.label PHASE1_RASTER   = TABLESTART - 1
+.label PHASE1_RASTER   = TABLESTART - 2 // was TABLESTART - 1
 
 // Raster line where PHASE2 starts (IRQ trigger when PHASE1 skipped)
 //.label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
@@ -30,11 +30,8 @@ INIT_VIC_AND_IRQ:
         sta     VICIRQFLAG
         
         // Clear high raster bit, enable display
-        lda     VICICR
-        and     #$7f
-        sta     VICICR
-        lda     #DISPLAYON
-        sta     VICICR
+        lda #DISPLAYOFF
+		sta VICICR
         
         // Disable CIA1 timer IRQ entirely
         lda     #$7f
@@ -117,7 +114,6 @@ IRQ2:
     beq *+2                 // 2 or 3 cycles → equalises
     nops(23)
     bit $02
-BROOK:
     lda COLORTABLE
 IRQHANDLER:
     jmp PHASE1_ACTIVE
@@ -157,6 +153,7 @@ PHASE1_ACTIVE:
         //nops(19)
 
 }
+TJUK:
 .for (var i = 33; i < (DISPOFF_TOP-1); i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
@@ -170,22 +167,30 @@ PHASE1_ACTIVE:
         sta     VICBGCOLOR
         lda     COLORTABLE+34+2	// this is used in the raster line after the next raster line
         ldx		COLORTABLE+34+1 // this is for the next raster line
-        nops(21)
+        nops(20)
         clc
         bcc     *+2
+	    //stx     VICBORDER			// 4
+	    //stx     VICBGCOLOR			// 4
+		ldx #$00
+	
+        
 
 
 
 PHASE2_ENTRY:
 .for (var row = 0; row < 24; row++) {
 	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
+TJEK:
 	    stx     VICBORDER			// 4
 	    stx     VICBGCOLOR			// 4
+		//nops(4)
 		nops(3)						// 6
 		nops(3)						// 6	Total = 20 (+40 stolen = 60)
-
-
-
+		
+		nops(20)
+	    bit		$02
+	
     // --- Next 6 raster lines are normal lines of this row ---
     .for (var line = 1; line < 7; line++) {
         sta     VICBORDER				// 4
@@ -215,6 +220,9 @@ PHASE2_ENTRY:
 		nops(3)					// 6
 		nops(3)						// 2
         bit $02//bcc     *+2				// 3	total = 63
+		//stx     VICBORDER			// 4
+	    //stx     VICBGCOLOR			// 4
+
 }
 
 // =========================================================
@@ -226,8 +234,8 @@ PHASE2_ENTRY:
     stx     VICBGCOLOR			// 4
     nops(3)						// 6
     nops(3)						// 6
-//    clc							// 2
-//    bcc		*+2					// 3	Total = 23 (+40 stolen = 63) 
+    nops(20)
+    bit		$02 
 
 .for (var line = 1; line < 5; line++) {
     sta     VICBORDER	// 4
@@ -250,7 +258,7 @@ PHASE2_ENTRY:
 PHASE2_OPENBORDER:
         sta     VICBORDER	// 4
         sta     VICBGCOLOR	// 4
-        lda     #$13		// 2
+        lda     #$03		// 2
         sta     VICICR		// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+5+1	// 4	
 		nops(3)	// 6
@@ -318,7 +326,8 @@ PHASE3_LOOP:
         nops(3)
         nops(3)
         nops(3)
-        nops(3)
+        nops(1)
+        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i+1	// Just a test to get rid of a small "overwrite"
         bit		$02
 
 } // 20+17 =37 raster lines
@@ -328,9 +337,9 @@ PHASE3_LOOP:
         // Runs directly after Phase3 (bottom border raster bars).
         // -------------------------------------------------------
 OFFSCREEN_WORK_AFTER_PHASE3:
-        lda     #$01
-        sta     VICBORDER
-        sta     VICBGCOLOR
+        //lda     #$01
+        sty     VICBORDER
+        sty     VICBGCOLOR
         
         SaveMainloopMeasurement()
         
@@ -352,7 +361,7 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         dec		$d006
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
-        lda     #$1b
+        lda     #$0b
         sta     VICICR
         rti
 

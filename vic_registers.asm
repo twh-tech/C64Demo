@@ -49,3 +49,4 @@
 
 // VICICR value for display on, 25 rows, no scroll, text mode
 .label DISPLAYON       = %00011011
+.label DISPLAYOFF	   = %00001011
