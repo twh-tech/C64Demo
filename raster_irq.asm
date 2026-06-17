@@ -70,21 +70,58 @@ INIT_VIC_AND_IRQ:
 // ----------------
 .align 256
 * = * "Raster interrupt code"
+
 IRQ1:
-        lda     VICIRQFLAG
-        and     #$01
-        bne     !is_raster+
-        rti
-!is_raster:
-        lda     #$01
-        sta     VICIRQFLAG
-		nops(13)
-		//clc
-		//bcc		*+2
-		lda		COLORTABLE	// This is the first color value pre-loaded for Phase1
-							// I guess it needs to be different if Phase1 is skipped
+    lda #<IRQ2
+    sta $fffe
+    lda #>IRQ2
+    sta $ffff
+    inc VICRASTER
+    lda #$01                // acknowledge BEFORE cli
+    sta VICIRQFLAG
+    cli                     // NOW enable interrupts
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    sei
+    rti
+IRQ2:
+    lda #<IRQ1
+    sta $fffe
+    lda #>IRQ1
+    sta $ffff
+    dec VICRASTER
+    lda #$01
+    sta VICIRQFLAG
+	nops(11)
+    // PAL stabilisation
+    ldx $d012               // 4 cycles → lands at 57 or 59
+    cpx $d012               // 4 cycles → lands at 61 or 63  ← straddles boundary
+    beq *+2                 // 2 or 3 cycles → equalises
+    nops(23)
+    bit $02
+BROOK:
+    lda COLORTABLE
 IRQHANDLER:
-        jmp     PHASE1_ACTIVE
+    jmp PHASE1_ACTIVE
+
 
         // -------------------------------------------------------
         // PHASE1 active: raster bars for top border area
