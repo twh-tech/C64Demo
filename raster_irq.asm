@@ -154,7 +154,7 @@ PHASE1_ACTIVE:
 
 }
 TJUK:
-.for (var i = 33; i < (DISPOFF_TOP-1); i++) {
+.for (var i = 33; i < (DISPOFF_TOP-1-1); i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
@@ -170,8 +170,6 @@ TJUK:
         nops(20)
         clc
         bcc     *+2
-	    //stx     VICBORDER			// 4
-	    //stx     VICBGCOLOR			// 4
 		ldx #$00
 	
         
@@ -184,12 +182,11 @@ PHASE2_ENTRY:
 TJEK:
 	    stx     VICBORDER			// 4
 	    stx     VICBGCOLOR			// 4
-		//nops(4)
 		nops(3)						// 6
 		nops(3)						// 6	Total = 20 (+40 stolen = 60)
 		
-		nops(20)
-	    bit		$02
+//		nops(20)	// These two lines can be used if we blank the screen and have no bad lines
+//	    bit		$02
 	
     // --- Next 6 raster lines are normal lines of this row ---
     .for (var line = 1; line < 7; line++) {
@@ -220,8 +217,6 @@ TJEK:
 		nops(3)					// 6
 		nops(3)						// 2
         bit $02//bcc     *+2				// 3	total = 63
-		//stx     VICBORDER			// 4
-	    //stx     VICBGCOLOR			// 4
 
 }
 
@@ -234,8 +229,8 @@ TJEK:
     stx     VICBGCOLOR			// 4
     nops(3)						// 6
     nops(3)						// 6
-    nops(20)
-    bit		$02 
+//    nops(20)
+//    bit		$02 
 
 .for (var line = 1; line < 5; line++) {
     sta     VICBORDER	// 4
@@ -258,7 +253,7 @@ TJEK:
 PHASE2_OPENBORDER:
         sta     VICBORDER	// 4
         sta     VICBGCOLOR	// 4
-        lda     #$03		// 2
+        lda     #$13		// 2
         sta     VICICR		// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+5+1	// 4	
 		nops(3)	// 6
@@ -361,7 +356,7 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         dec		$d006
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
-        lda     #$0b
+        lda     #$1b
         sta     VICICR
         rti
 
