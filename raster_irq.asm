@@ -101,23 +101,26 @@ IRQ1:
     sei
     rti
 IRQ2:
-    lda #<IRQ1
-    sta $fffe
-    lda #>IRQ1
-    sta $ffff
-    dec VICRASTER
-    lda #$01
-    sta VICIRQFLAG
+    lda		#<IRQ1
+    sta		$fffe
+    lda		#>IRQ1
+    sta		$ffff
+    dec		VICRASTER
+    lda		#$01
+    sta		VICIRQFLAG
 	nops(11)
     // PAL stabilisation
-    ldx $d012               // 4 cycles → lands at 57 or 59
-    cpx $d012               // 4 cycles → lands at 61 or 63  ← straddles boundary
-    beq *+2                 // 2 or 3 cycles → equalises
-    nops(23)
-    bit $02
-    lda COLORTABLE
+    ldx		$d012               // 4 cycles → lands at 57 or 59
+    cpx		$d012               // 4 cycles → lands at 61 or 63  ← straddles boundary
+    beq		*+2                 // 2 or 3 cycles → equalises
+    nops(21)
+    bit		$02
+    ldx		COLORTABLE+34		// This color will be used in the first raster line of phase2 is phase1 is skipped
+PRELOAD_A:
+    lda		COLORTABLE			// This color will be either used in the first raster line of phase1 or the second raster line of phase2
+    						// It will, potentially, be modified every frame
 IRQHANDLER:
-    jmp PHASE1_ACTIVE
+    jmp		PHASE1_ACTIVE
 
 
         // -------------------------------------------------------
@@ -440,6 +443,10 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         sta     IRQHANDLER+1
         lda     #>PHASE2_ENTRY        // was PHASE2_ENTRY_SKIP
         sta     IRQHANDLER+2
+        lda     #<(COLORTABLE+34+1)
+        sta     PRELOAD_A+1
+        lda     #>(COLORTABLE+34+1)
+        sta     PRELOAD_A+2
         lda     #<PHASE3_LOOP
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
@@ -455,6 +462,10 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         sta     IRQHANDLER+1
         lda     #>PHASE1_ACTIVE
         sta     IRQHANDLER+2
+        lda     #<COLORTABLE
+        sta     PRELOAD_A+1
+        lda     #>COLORTABLE
+        sta     PRELOAD_A+2
         lda     #<OFFSCREEN_WORK_AFTER_PHASE2
         sta     PHASE3_JMP+1
         lda     #>OFFSCREEN_WORK_AFTER_PHASE2
@@ -470,6 +481,10 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         sta     IRQHANDLER+1
         lda     #>PHASE1_ACTIVE
         sta     IRQHANDLER+2
+        lda     #<COLORTABLE
+        sta     PRELOAD_A+1
+        lda     #>COLORTABLE
+        sta     PRELOAD_A+2
         lda     #<PHASE3_LOOP       // don't skip Phase3
         sta     PHASE3_JMP+1
         lda     #>PHASE3_LOOP
