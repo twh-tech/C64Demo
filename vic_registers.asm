@@ -15,6 +15,17 @@
 // Write: raster line to trigger IRQ on
 .label VICRASTER       = $d012
 
+// Sprite enable register
+// Bit 0 = sprite 0
+// Bit 1 = sprite 1
+// Bit 2 = sprite 2
+// Bit 3 = sprite 3
+// Bit 4 = sprite 4
+// Bit 5 = sprite 5
+// Bit 6 = sprite 6
+// Bit 7 = sprite 7
+.label VIC_SPRITE_ENABLE = $D015
+
 // Control register 2 / horizontal scroll
 // Bits 0-2: horizontal fine scroll (0-7)
 // Bit 3: 38/40 column select (0=38 cols, 1=40 cols)

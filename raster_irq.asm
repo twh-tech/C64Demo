@@ -12,7 +12,8 @@
 
 // Raster line where PHASE2 starts (IRQ trigger when PHASE1 skipped)
 //.label PHASE2_RASTER   = TABLESTART - 1 + DISPOFF_TOP
-.label PHASE2_RASTER = 50 
+.label PHASE2_RASTER = 48 
+//.label PHASE2_RASTER = PHASE1_RASTER + DISPOFF_TOP  // tune the +1 by testing
 .label PHASE3_SIZE     = 37
 .label RASTER_STATE_TOP_ACTIVE    = 1
 .label RASTER_STATE_BOTTOM_ACTIVE = 0
@@ -56,9 +57,9 @@ INIT_VIC_AND_IRQ:
         lda     #$01
         sta     VICIRQENABLE
 
-//		SetRasterStateBottomActive()
-//		SetRasterStateTopActive()
-		SetRasterStateBothActive()
+		SetRasterStateBottomActive()
+		//SetRasterStateTopActive()
+		//SetRasterStateBothActive()
         cli
         rts
 
@@ -123,7 +124,7 @@ IRQHANDLER:
         // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
-.for (var i = 0; i < 12; i++) {
+.for (var i = 0; i < 9; i++) {
         sta     VICBORDER		// 4
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+i+1	// 4
@@ -133,28 +134,50 @@ PHASE1_ACTIVE:
         bcc     *+2				// 3	Total = 63
 }
 
+
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+		lda     COLORTABLE+9+1	// 4
+
+        nops(23)				// 46
+        clc						// 2
+        bcc     *+2				// 3	Total = 63
+
+
+
+        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
+		lda     COLORTABLE+10+1	// 4
+
+        nops(23)				// 46
+        //bit $02
+        clc						// 2
+        bcc     *+2				// 3	Total = 63
+
+
+SJASK: // LIN=27 ($1b), CYC=59
 // This is the sprite-compensation raster lines for test.
-.for (var i = 12; i < 33; i++) {
+.for (var i = 11; i < 32; i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
 
 		// no sprites
-        nops(23)				// 46
+		nops(23)
+		//bit		$02
         clc						// 2
         bcc     *+2				// 3	Total = 63
 
-/*		// sprites visible
-		nops(18) //was23
-		clc
-		bcc		*+2
-*/
+		//nops(18)
+	
+		// sprites visible
+		//bit		$02
+
 	// nops(19) compensates for the bottom 4 sprites
         //nops(19)
-
 }
 TJUK:
-.for (var i = 33; i < (DISPOFF_TOP-1-1); i++) {
+.for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
@@ -165,12 +188,12 @@ TJUK:
 		// This is the last rasterline in Phase1 before the screen area
         sta     VICBORDER
         sta     VICBGCOLOR
-        lda     COLORTABLE+34+2	// this is used in the raster line after the next raster line
-        ldx		COLORTABLE+34+1 // this is for the next raster line
-        nops(20)
+        lda     COLORTABLE+34+1	// this is used in the raster line after the next raster line
+        ldx		COLORTABLE+34 // this is for the next raster line
+        nops(21)
         clc
         bcc     *+2
-		ldx #$00
+		//ldx #$00
 	
         
 
@@ -192,7 +215,7 @@ TJEK:
     .for (var line = 1; line < 7; line++) {
         sta     VICBORDER				// 4
         sta     VICBGCOLOR				// 4
-        lda     COLORTABLE + DISPOFF_TOP + row*8+line+1	// 4
+        lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4   
 		nops(3)					// 6
 		nops(3)					// 6
 		nops(3)					// 6
@@ -206,8 +229,8 @@ TJEK:
     	// This is the last raster line in each of the 25 character rows
         sta     VICBORDER				// 4
         sta     VICBGCOLOR				// 4
-        lda     COLORTABLE + DISPOFF_TOP + row*8+7+2	// 4
-        ldx		COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
+        lda     COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
+        ldx		COLORTABLE + DISPOFF_TOP + row*8+7+0	// 4
 		nop
 		nops(3)					// 6
 		nops(3)					// 6
@@ -235,7 +258,7 @@ TJEK:
 .for (var line = 1; line < 5; line++) {
     sta     VICBORDER	// 4
 	sta     VICBGCOLOR	// 4
-    lda     COLORTABLE + DISPOFF_TOP + 24*8+line+1	// 4
+    lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
 	nops(3)			// 6
 	nops(3)			// 6
 	nops(3)			// 6
@@ -255,7 +278,7 @@ PHASE2_OPENBORDER:
         sta     VICBGCOLOR	// 4
         lda     #$13		// 2
         sta     VICICR		// 4
-        lda     COLORTABLE + DISPOFF_TOP + 24*8+5+1	// 4	
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
 		nops(3)	// 6
 		nops(3)	// 6
 		nops(3)	// 6
@@ -265,7 +288,8 @@ PHASE2_OPENBORDER:
 		nop	// 2
 		clc
 		bcc		*+2
-		lda		#$00	
+		nop
+		//lda		#$00	
 
         //bit     $02	// 3	total = 63
 
@@ -273,7 +297,7 @@ PHASE2_OPENBORDER:
 PHASE2_PENULTIMATE:
         sta     VICBORDER							// 4
         sta     VICBGCOLOR							// 4
-        lda     COLORTABLE + DISPOFF_TOP + 24*8+6+1	// 4
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
 		nops(3) // 6
 		nops(3) // 6
 		nops(3) // 6
@@ -291,7 +315,6 @@ PHASE2_PENULTIMATE:
 PHASE2_LAST:
         sta     VICBORDER			// 4
         sta     VICBGCOLOR			// 4
-        lda     COLORTABLE + DISPOFF_TOP + 25*8	// 4
 		nops(3)					// 6
 		nops(3)					// 6
 		nops(3)					// 6
@@ -299,7 +322,13 @@ PHASE2_LAST:
 		nops(3)					// 6
 		nops(3)					// 6
 		nops(3)					// 6
-		nops(3)					// 6
+
+		//nops(3)					// 6
+		// disable sprites to avoid ghost lines in the bottom
+        lda     #%00000000
+        sta     VIC_SPRITE_ENABLE
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
+
 //        clc						// 2
 //        bcc     *+2				// 3
 PHASE3_JMP:        
@@ -313,7 +342,7 @@ PHASE3_LOOP:
 .for (var i = 0; i < 37; i++) {
         sta     VICBORDER
         sta     VICBGCOLOR
-        lda     COLORTABLE + DISPOFF_TOP + 25*8+i+1
+        lda     COLORTABLE + DISPOFF_TOP + 25*8+i
         nops(3)
         nops(3)
         nops(3)
@@ -322,7 +351,7 @@ PHASE3_LOOP:
         nops(3)
         nops(3)
         nops(1)
-        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i+1	// Just a test to get rid of a small "overwrite"
+        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i	// Just a test to get rid of a small "overwrite"
         bit		$02
 
 } // 20+17 =37 raster lines
@@ -332,16 +361,16 @@ PHASE3_LOOP:
         // Runs directly after Phase3 (bottom border raster bars).
         // -------------------------------------------------------
 OFFSCREEN_WORK_AFTER_PHASE3:
-        //lda     #$01
+        ldy     #$00
         sty     VICBORDER
         sty     VICBGCOLOR
         
-        SaveMainloopMeasurement()
+//        SaveMainloopMeasurement()
         
-        //jsr		DORASTERBARS
         jsr     DOSCROLL
         //jsr     UPDATESPEED
         //jsr     MOVESPRITES
+        jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
      	
@@ -358,6 +387,16 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
         sta     VICICR
+
+		// re-enable sprite visibility
+        lda		#DISABLESPRITES
+        sta     VIC_SPRITE_ENABLE
+
+		// As Phase1 will be skipped, we need to preload X and A with raster line colors  
+TUST:
+        ldx		COLORTABLE+34 // this is for the first raster line in Phase2
+        lda     COLORTABLE+34+1	// this is for the second raster line in Phase2
+
         rti
 
         // ---------------------------------------------
@@ -365,15 +404,15 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         // Phase3 (bottom border) is skipped this frame.
         // ---------------------------------------------
 OFFSCREEN_WORK_AFTER_PHASE2:
-        lda     #$01
-        sta     VICBORDER
-        sta     VICBGCOLOR
+        ldy     #$00
+        sty     VICBORDER
+        sty     VICBGCOLOR
         
-        SaveMainloopMeasurement()
-		//jsr		DORASTERBARS
+//        SaveMainloopMeasurement()
         jsr     DOSCROLL
         //jsr     UPDATESPEED
         //jsr     MOVESPRITES
+		jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
 		
@@ -384,6 +423,11 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
         sta     VICICR
+
+		// re-enable sprite visibility
+        lda		#DISABLESPRITES
+        sta     VIC_SPRITE_ENABLE
+
         rti
 
 // ------

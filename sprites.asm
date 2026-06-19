@@ -91,6 +91,7 @@ SETUPSPRITES:
         sta     $d001
         sta     $d003  
         lda		#$1b
+        lda #$1b
         sta     $d001        
         sta     $d003  
         sta     $d005
@@ -102,8 +103,19 @@ SETUPSPRITES:
         sta     $d00f  
 
         // Enable sprite(s)
-        lda     #%10000010
-//        sta     $d015
+        //lda     #%00000100
+.label DISABLESPRITES  = %00000000
+.label ONESPRITE	   = %00000001
+.label TWOSPRITES	   = %00000011
+.label THREESPRITES	   = %00000111
+.label FOURSPRITES	   = %00001111
+.label FIVESPRITES	   = %00011111
+.label SIXSPRITES	   = %00111111
+.label SEVENSPRITES	   = %01111111
+.label EIGHTSPRITES	   = %11111111
+        //lda     #%11111111
+        lda		#DISABLESPRITES
+        sta     VIC_SPRITE_ENABLE
 		rts
 
 MOVESPRITES:
