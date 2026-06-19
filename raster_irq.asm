@@ -152,7 +152,6 @@ PHASE1_ACTIVE:
 
 //        sta     VICBORDER		// 4
         sta     VICBGCOLOR		// 4
-        sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+10+1	// 4
 
         nops(22)				// 46
