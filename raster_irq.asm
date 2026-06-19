@@ -152,6 +152,7 @@ PHASE1_ACTIVE:
 
 //        sta     VICBORDER		// 4
         sta     VICBGCOLOR		// 4
+        sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+10+1	// 4
 
         nops(22)				// 46
@@ -169,15 +170,14 @@ SJASK: // LIN=27 ($1b), CYC=59
         sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
-
-		// no sprites
-		nops(20)
-		//bit		$02
-        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
-        //sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
         nops(2)
-//        nop
-
+        ldy     #D016_WIDE          // re-arm the right edge at the far position
+        sty     VICXSCROLL          //  -> write lands on cycle 17
+        nops(15)
+		nop
+        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
+        bit		$02
 }
 TJUK:
 .for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
@@ -278,6 +278,8 @@ TJEK:
 PHASE2_OPENBORDER:
         sta     VICBORDER	// 4
         sta     VICBGCOLOR	// 4
+        
+        // Open top/bottom border trick should on raster lines 248-250
         lda     #$13		// 2
         sta     VICICR		// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
@@ -398,7 +400,7 @@ delay1:
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#ONESPRITE
+        lda		#DISABLESPRITES
         sta     VIC_SPRITE_ENABLE
 
 		// As Phase1 will be skipped, we need to preload X and A with raster line colors  
@@ -440,7 +442,7 @@ delay2:
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#ONESPRITE
+        lda		#DISABLESPRITES
         sta     VIC_SPRITE_ENABLE
 
         rti

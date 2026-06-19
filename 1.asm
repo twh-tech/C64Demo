@@ -34,7 +34,7 @@ RASTER_STATE:
 
 * = $3FFF "Garbagebyte"
 //.byte $55    // garbagebyte - must stay $00 for open border trick
-.byte $00
+.byte $55
 
 MAINLOOP_COUNT:   .byte 0
 

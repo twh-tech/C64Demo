@@ -58,8 +58,9 @@ SETUPSPRITES:
         sta     $d02e           // sprite 1 color        
 
 // X positions evenly distributed across screen
-        lda     #24
+        lda     #70
         sta     $d000           // sprite 0 X = 24
+        
         lda     #66
         sta     $d002           // sprite 1 X = 66
         lda     #108
@@ -75,7 +76,7 @@ SETUPSPRITES:
         lda     #62             // 318 - 256 = 62
         sta     $d00e           // sprite 7 X low byte (full X = 318)
         // Set MSB for sprites 6 and 7 (X >= 256)
-        lda     #%11000000
+        lda     #%11000001
         sta     $d010
 
 
@@ -114,7 +115,7 @@ SETUPSPRITES:
 .label SEVENSPRITES	   = %01111111
 .label EIGHTSPRITES	   = %11111111
         //lda     #%11111111
-        lda		#ONESPRITE
+        lda		#DISABLESPRITES
         sta     VIC_SPRITE_ENABLE
 		rts
 
