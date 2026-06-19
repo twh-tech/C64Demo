@@ -128,7 +128,8 @@ IRQHANDLER:
         // -------------------------------------------------------
 PHASE1_ACTIVE:
 .for (var i = 0; i < 9; i++) {
-        sta     VICBORDER		// 4
+//        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+i+1	// 4
 
@@ -138,7 +139,8 @@ PHASE1_ACTIVE:
 }
 
 
-        sta     VICBORDER		// 4
+//        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+9+1	// 4
 
@@ -148,7 +150,8 @@ PHASE1_ACTIVE:
 
 
 
-        sta     VICBORDER		// 4
+//        sta     VICBORDER		// 4
+        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+10+1	// 4
 
@@ -163,8 +166,8 @@ PHASE1_ACTIVE:
 SJASK: // LIN=27 ($1b), CYC=59
 // This is where I test cycle compensation.
 .for (var i = 11; i < 32; i++) {
-        sta     VICBORDER
-//        sta     VICBGCOLOR		// 4
+//        sta     VICBORDER
+        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
 
@@ -384,12 +387,12 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         dec		$d006
         dec		$d006
 */
-
+/*
     ldx #$80
 delay1:
     dex
     bne delay1
-
+*/
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
@@ -427,7 +430,7 @@ OFFSCREEN_WORK_AFTER_PHASE2:
 		ActivateBottomIfBarEntersBottom()
 
 
-    ldx #$80
+    ldx #$10
 delay2:
     dex
     bne delay2
