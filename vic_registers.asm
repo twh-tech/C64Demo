@@ -32,6 +32,9 @@
 // Bit 4: multicolor mode enable
 .label VICXSCROLL      = $d016
 
+.label D016_NARROW = $00    // 38-column mode, scroll=0
+.label D016_WIDE   = $08    // 40-column mode, scroll=0
+
 // Memory control register
 // Bits 1-3: character set base address (within VIC bank, x * $0800)
 // Bits 4-7: screen RAM base address (within VIC bank, x * $0400)

@@ -57,8 +57,8 @@ INIT_VIC_AND_IRQ:
         lda     #$01
         sta     VICIRQENABLE
 
-		SetRasterStateBottomActive()
-		//SetRasterStateTopActive()
+		//SetRasterStateBottomActive()
+		SetRasterStateTopActive()
 		//SetRasterStateBothActive()
         cli
         rts
@@ -152,50 +152,47 @@ PHASE1_ACTIVE:
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+10+1	// 4
 
-        nops(23)				// 46
+        nops(22)				// 46
+//        lda #$00
         //bit $02
+        nop
         clc						// 2
         bcc     *+2				// 3	Total = 63
 
 
 SJASK: // LIN=27 ($1b), CYC=59
-// This is the sprite-compensation raster lines for test.
+// This is where I test cycle compensation.
 .for (var i = 11; i < 32; i++) {
         sta     VICBORDER
+//        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
 
 		// no sprites
-		nops(23)
+		nops(20)
 		//bit		$02
-        clc						// 2
-        bcc     *+2				// 3	Total = 63
+        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        //sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
+        nops(2)
+//        nop
 
-		//nops(18)
-	
-		// sprites visible
-		//bit		$02
-
-	// nops(19) compensates for the bottom 4 sprites
-        //nops(19)
 }
 TJUK:
 .for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
         sta     VICBORDER
-        sta     VICBGCOLOR
+        sta     VICBGCOLOR		// 4
         lda     COLORTABLE+i+1
-        nops(23)
-        clc
-        bcc     *+2
+        nops(24)
+        bit		$02
 }
 		// This is the last rasterline in Phase1 before the screen area
         sta     VICBORDER
-        sta     VICBGCOLOR
+        sta     VICBGCOLOR		// 4
+//        sta     VICBGCOLOR
         lda     COLORTABLE+34+1	// this is used in the raster line after the next raster line
         ldx		COLORTABLE+34 // this is for the next raster line
-        nops(21)
-        clc
-        bcc     *+2
+        nops(22)
+		bit		$02
 		//ldx #$00
 	
         
@@ -370,29 +367,36 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         
 //        SaveMainloopMeasurement()
         
-        jsr     DOSCROLL
+        //jsr     DOSCROLL
         //jsr     UPDATESPEED
         //jsr     MOVESPRITES
-        jsr		DORASTERBARS
+        //jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
      	
         // running when bottom active, watch for bar entering top
         ActivateTopIfBarEntersTop()
-        
+/*        
         inc		$d000
         dec		$d002        
         inc		$d004
         inc		$d004
         dec		$d006
         dec		$d006
+*/
+
+    ldx #$80
+delay1:
+    dex
+    bne delay1
+
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#DISABLESPRITES
+        lda		#ONESPRITE
         sta     VIC_SPRITE_ENABLE
 
 		// As Phase1 will be skipped, we need to preload X and A with raster line colors  
@@ -412,23 +416,29 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         sty     VICBGCOLOR
         
 //        SaveMainloopMeasurement()
-        jsr     DOSCROLL
+        //jsr     DOSCROLL
         //jsr     UPDATESPEED
         //jsr     MOVESPRITES
-		jsr		DORASTERBARS
+		//jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
 		
 		// running when top active, watch for bar entering bottom
 		ActivateBottomIfBarEntersBottom()
 
+
+    ldx #$80
+delay2:
+    dex
+    bne delay2
+    
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#DISABLESPRITES
+        lda		#ONESPRITE
         sta     VIC_SPRITE_ENABLE
 
         rti

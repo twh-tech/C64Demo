@@ -114,7 +114,7 @@ SETUPSPRITES:
 .label SEVENSPRITES	   = %01111111
 .label EIGHTSPRITES	   = %11111111
         //lda     #%11111111
-        lda		#DISABLESPRITES
+        lda		#ONESPRITE
         sta     VIC_SPRITE_ENABLE
 		rts
 
