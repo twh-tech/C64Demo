@@ -76,7 +76,7 @@ SETUPSPRITES:
         lda     #62             // 318 - 256 = 62
         sta     $d00e           // sprite 7 X low byte (full X = 318)
         // Set MSB for sprites 6 and 7 (X >= 256)
-        lda     #%11000001
+        lda     #%11110001
         sta     $d010
 
 
@@ -114,8 +114,8 @@ SETUPSPRITES:
 .label SIXSPRITES	   = %00111111
 .label SEVENSPRITES	   = %01111111
 .label EIGHTSPRITES	   = %11111111
-        //lda     #%11111111
-        lda		#DISABLESPRITES
+        lda     #%00100000
+        //lda		#ONESPRITE
         sta     VIC_SPRITE_ENABLE
 		rts
 

@@ -170,15 +170,20 @@ SJASK: // LIN=27 ($1b), CYC=59
         sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
-        nops(2)
-        ldy     #D016_WIDE          // re-arm the right edge at the far position
-        sty     VICXSCROLL          //  -> write lands on cycle 17
-        nops(15)
-		nop
+        ldx     #D016_WIDE          // re-arm the right edge at the far position
         ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        nops(10)
+        nops(3)
+		bit		$02
+        nop        
+        stx     VICXSCROLL          //  -> write lands on cycle 17
         sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
         bit		$02
+
 }
+//		inc		VICXSCROLL
+//		dec		VICXSCROLL
+
 TJUK:
 .for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
         sta     VICBORDER
@@ -400,7 +405,7 @@ delay1:
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#DISABLESPRITES
+        lda     #%00100000
         sta     VIC_SPRITE_ENABLE
 
 		// As Phase1 will be skipped, we need to preload X and A with raster line colors  
@@ -435,6 +440,9 @@ OFFSCREEN_WORK_AFTER_PHASE2:
 delay2:
     dex
     bne delay2
+
+
+        inc		$d00a
     
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
@@ -442,7 +450,7 @@ delay2:
         sta     VICICR
 
 		// re-enable sprite visibility
-        lda		#DISABLESPRITES
+        lda     #%00100000
         sta     VIC_SPRITE_ENABLE
 
         rti
