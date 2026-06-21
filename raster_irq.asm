@@ -127,69 +127,40 @@ IRQHANDLER:
         // PHASE1 active: raster bars for top border area
         // -------------------------------------------------------
 PHASE1_ACTIVE:
-.for (var i = 0; i < 9; i++) {
-//        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
+.for (var i = 0; i < 11; i++) {
         sta     VICBGCOLOR		// 4
 		lda     COLORTABLE+i+1	// 4
-
-        nops(23)				// 46
-        clc						// 2
-        bcc     *+2				// 3	Total = 63
+        ldx     #D016_WIDE          // re-arm the right edge at the far position
+        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        nops(20)				// 48
+        stx     VICXSCROLL          //  -> write lands on cycle 17
+        sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
+        bit     $02				// 3	Total = 63
 }
-
-
-//        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        sta     VICBGCOLOR		// 4
-		lda     COLORTABLE+9+1	// 4
-
-        nops(23)				// 46
-        clc						// 2
-        bcc     *+2				// 3	Total = 63
-
-
-
-//        sta     VICBORDER		// 4
-        sta     VICBGCOLOR		// 4
-        sta     VICBGCOLOR		// 4
-		lda     COLORTABLE+10+1	// 4
-
-        nops(22)				// 46
-//        lda #$00
-        //bit $02
-        nop
-        clc						// 2
-        bcc     *+2				// 3	Total = 63
-
 
 SJASK: // LIN=27 ($1b), CYC=59
 // This is where I test cycle compensation.
 .for (var i = 11; i < 32; i++) {
-//        sta     VICBORDER
-        sta     VICBGCOLOR		// 4
         sta     VICBGCOLOR
         lda     COLORTABLE+i+1
         ldx     #D016_WIDE          // re-arm the right edge at the far position
         ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
-        nops(10)
-        nops(3)
-		bit		$02
-        nop        
+        nops(16)
+        bit		$02  
         stx     VICXSCROLL          //  -> write lands on cycle 17
         sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
         bit		$02
-
 }
-//		inc		VICXSCROLL
-//		dec		VICXSCROLL
 
-TJUK:
+// Last two raster lines of Phase1
 .for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
-        sta     VICBORDER
         sta     VICBGCOLOR		// 4
         lda     COLORTABLE+i+1
-        nops(24)
+        ldx     #D016_WIDE          // re-arm the right edge at the far position
+        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        nops(20)
+        stx     VICXSCROLL          //  -> write lands on cycle 17
+        sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
         bit		$02
 }
 		// This is the last rasterline in Phase1 before the screen area
