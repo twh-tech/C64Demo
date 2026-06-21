@@ -114,6 +114,12 @@ SETUPSPRITES:
 .label SIXSPRITES	   = %00111111
 .label SEVENSPRITES	   = %01111111
 .label EIGHTSPRITES	   = %11111111
+
+.label SPR5_X_MSB_BIT  = %00100000     // sprite 5's MSB bit in $d010
+.label SPR5_X_MSB_CLR  = %11011111     // inverse mask, clears that bit
+.label SPR5_X_DEAD_LO  = $f8           // low byte where the 8 nonexistent X values begin (V=504)
+
+
         lda     #%00100000
         //lda		#ONESPRITE
         sta     VIC_SPRITE_ENABLE
@@ -123,9 +129,28 @@ MOVESPRITES:
         //inc     $d001
         //inc     $d003  
         //inc     $d005
-        inc     $d001  
-        dec     $d009
+//        inc     $d001  
+//        dec     $d009
         //inc     $d00b  
         //inc     $d00d
         //inc     $d00f 
+
+        inc     $d00a
+        bne     spr5_x_check_wrap
+        lda     $d010
+        eor     #SPR5_X_MSB_BIT
+        sta     $d010
+spr5_x_check_wrap:
+        lda     $d010
+        and     #SPR5_X_MSB_BIT
+        beq     spr5_x_done             // msb clear -> V in 0..255, nowhere near the dead values
+        lda     $d00a
+        cmp     #SPR5_X_DEAD_LO
+        bne     spr5_x_done
+        lda     #$00
+        sta     $d00a                   // snap straight to V=0
+        lda     $d010
+        and     #SPR5_X_MSB_CLR
+        sta     $d010
+spr5_x_done:
         rts

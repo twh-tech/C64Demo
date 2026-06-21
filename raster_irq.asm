@@ -378,21 +378,13 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         
         //jsr     DOSCROLL
         //jsr     UPDATESPEED
-        //jsr     MOVESPRITES
+        jsr     MOVESPRITES
         //jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
      	
         // running when bottom active, watch for bar entering top
         ActivateTopIfBarEntersTop()
-/*        
-        inc		$d000
-        dec		$d002        
-        inc		$d004
-        inc		$d004
-        dec		$d006
-        dec		$d006
-*/
 /*
     ldx #$80
 delay1:
@@ -427,7 +419,7 @@ OFFSCREEN_WORK_AFTER_PHASE2:
 //        SaveMainloopMeasurement()
         //jsr     DOSCROLL
         //jsr     UPDATESPEED
-        //jsr     MOVESPRITES
+        jsr     MOVESPRITES
 		//jsr		DORASTERBARS
         
         //UpdateSidPlayerArkPandora()
@@ -442,8 +434,6 @@ delay2:
     bne delay2
 
 
-        inc		$d00a
-    
         // Write $1b to VICICR to restore 25-row mode each frame,
         // which is what keeps the bottom border open (open border trick)
         lda     #$1b
