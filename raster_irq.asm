@@ -182,42 +182,25 @@ PHASE2_ENTRY:
 .for (var row = 0; row < 24; row++) {
 	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
 TJEK:
-	    nops(2)			// 4
 	    stx     VICBGCOLOR			// 4
-		nops(3)						// 6
-		nops(3)						// 6	Total = 20 (+40 stolen = 60)
+		nops(8)						// 6
 		
 //		nops(20)	// These two lines can be used if we blank the screen and have no bad lines
 //	    bit		$02
 	
     // --- Next 6 raster lines are normal lines of this row ---
     .for (var line = 1; line < 7; line++) {
-	    nops(2)			// 4
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4   
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)						// 2
+		nops(26)						// 2
         bit $02//bcc     *+2				// 3	total = 63
     }
     	// This is the last raster line in each of the 25 character rows
-	    nops(2)			// 4
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
         ldx		COLORTABLE + DISPOFF_TOP + row*8+7+0	// 4
 		nop
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-
-		nops(3)					// 6
-		nops(2)					// 4
+		nops(19)					// 4
 		ldy		SCROLLX			// 4
         sty     VICXSCROLL		// 4
 
@@ -229,91 +212,44 @@ TJEK:
 // =========================================================
 
     // 1st raster line in 25th text row is a Bad line, 40 cycles stolen, 23 remain
-	    nops(2)			// 4
     stx     VICBGCOLOR			// 4
-    nops(3)						// 6
-    nops(3)						// 6
-//    nops(20)
-//    bit		$02 
+    nops(8)						// 6
 
 .for (var line = 1; line < 5; line++) {
-	    nops(2)			// 4
 	sta     VICBGCOLOR	// 4
     lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
-	nops(3)			// 6
-	nops(3)			// 6
-	nops(3)			// 6
-	nops(3)			// 6
-	nops(3)			// 6
-	nops(3)			// 6
-	nops(3)			// 6
-    nop				// 2
-    nop				// 2
-    clc				// 2
-    bcc     *+2     // 3	total = 63
+    nops(26)
+    bit $02
 }
 
 // --- Third-last line: open border trick ---
 PHASE2_OPENBORDER:
-	    nops(2)			// 4
         sta     VICBGCOLOR	// 4
         
         // Open top/bottom border trick should on raster lines 248-250
         lda     #$13		// 2
         sta     VICICR		// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
-		nops(3)	// 6
-		nops(3)	// 6
-		nops(3)	// 6
-		nops(3)	// 6
-		nops(3)	// 6
-		nops(3)	// 6
-		nop	// 2
-		clc
-		bcc		*+2
-		nop
-		//lda		#$00	
-
-        //bit     $02	// 3	total = 63
+		nops(23)
+		bit		$02
 
 // --- Penultimate line: normal ---
 PHASE2_PENULTIMATE:
-	    nops(2)			// 4
         sta     VICBGCOLOR							// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
-		nops(3) // 6
-		nops(3) // 6
-		nops(3) // 6
-		nops(3) // 6
-		nops(3) // 6
-		nops(3) // 6
-		nops(3) // 6
-		//nops(3) // 6
-		clc
-		bcc		*+2
-        nop		// 2
-        nop		// 2	Total = 64 
+		nops(26) // 6
+		bit		$02
 
 // --- Last line: normal ---
 PHASE2_LAST:
-	    nops(2)			// 4
         sta     VICBGCOLOR			// 4
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
+		nops(23)					// 6
 
-		//nops(3)					// 6
 		// disable sprites to avoid ghost lines in the bottom
         lda     #%00000000
         sta     VIC_SPRITE_ENABLE
         lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
 
-//        clc						// 2
-//        bcc     *+2				// 3
 PHASE3_JMP:        
         jmp     PHASE3_LOOP		// 3	Total = 62
 
@@ -323,21 +259,19 @@ PHASE3_JMP:
 
 PHASE3_LOOP:
 .for (var i = 0; i < 37; i++) {
-	    nops(2)			// 4
         sta     VICBGCOLOR
         lda     COLORTABLE + DISPOFF_TOP + 25*8+i
-        nops(3)
-        nops(3)
-        nops(3)
-        nops(3)
-        nops(3)
-        nops(3)
-        nops(3)
-        nops(1)
-        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i	// Just a test to get rid of a small "overwrite"
+        ldx     #D016_WIDE          // re-arm the right edge at the far position
+        ldy     #D016_NARROW       // offsets 55-56  (2 cycles)
+        nops(20)				// 48
+        stx     VICXSCROLL          //  -> write lands on cycle 17
+        sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
+//        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i	// Just a test to get rid of a small "overwrite"
         bit		$02
 
-} // 20+17 =37 raster lines
+}
+
+
 
 
 		// -------------------------------------------------------
