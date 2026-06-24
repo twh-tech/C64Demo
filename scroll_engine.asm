@@ -1,5 +1,5 @@
 // scroll_engine.asm
-.label SCROLLROW       = 12
+.label SCROLLROW       = 23
 .label SCROLLRAM       = $0400 + SCROLLROW * 40
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
 
@@ -330,14 +330,14 @@ INITSCROLL:
 		// Color of top scroll line
         lda     #$0c            // medium gray
         ldx     #39
-!:      sta     $d9e0,x
+!:      sta     $d800 + SCROLLROW * 40,x
         dex
         bpl     !-
 
 		// Color of bottom scroll line
         lda     #$0b            // dark gray
         ldx     #39
-!:      sta     $da08,x
+!:      sta     $d800 + (SCROLLROW+1) * 40,x
         dex
         bpl     !-
 

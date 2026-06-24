@@ -58,8 +58,8 @@ INIT_VIC_AND_IRQ:
         sta     VICIRQENABLE
 
 		//SetRasterStateBottomActive()
-		SetRasterStateTopActive()
-		//SetRasterStateBothActive()
+		//SetRasterStateTopActive()
+		SetRasterStateBothActive()
         cli
         rts
 
@@ -214,11 +214,13 @@ TJEK:
 		nops(3)					// 6
 		nops(3)					// 6
 		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)					// 6
-		nops(3)						// 2
-        bit $02//bcc     *+2				// 3	total = 63
 
+		nops(3)					// 6
+		nops(2)					// 4
+		ldy		SCROLLX			// 4
+        sty     VICXSCROLL		// 4
+
+        bit $02//bcc     *+2				// 3	total = 63
 }
 
 // =========================================================
@@ -347,7 +349,7 @@ OFFSCREEN_WORK_AFTER_PHASE3:
         
 //        SaveMainloopMeasurement()
         
-        //jsr     DOSCROLL
+        jsr     DOSCROLL
         //jsr     UPDATESPEED
         jsr     MOVESPRITES
         //jsr		DORASTERBARS
@@ -388,7 +390,7 @@ OFFSCREEN_WORK_AFTER_PHASE2:
         sty     VICBGCOLOR
         
 //        SaveMainloopMeasurement()
-        //jsr     DOSCROLL
+        jsr     DOSCROLL
         //jsr     UPDATESPEED
         jsr     MOVESPRITES
 		//jsr		DORASTERBARS
