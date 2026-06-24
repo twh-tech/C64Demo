@@ -78,6 +78,7 @@ IRQ1:
     lda #$01                // acknowledge BEFORE cli
     sta VICIRQFLAG
     cli                     // NOW enable interrupts
+    skla:
     nop
     nop
     nop
@@ -181,7 +182,7 @@ PHASE2_ENTRY:
 .for (var row = 0; row < 24; row++) {
 	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
 TJEK:
-	    stx     VICBORDER			// 4
+	    nops(2)			// 4
 	    stx     VICBGCOLOR			// 4
 		nops(3)						// 6
 		nops(3)						// 6	Total = 20 (+40 stolen = 60)
@@ -191,7 +192,7 @@ TJEK:
 	
     // --- Next 6 raster lines are normal lines of this row ---
     .for (var line = 1; line < 7; line++) {
-        sta     VICBORDER				// 4
+	    nops(2)			// 4
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4   
 		nops(3)					// 6
@@ -205,7 +206,7 @@ TJEK:
         bit $02//bcc     *+2				// 3	total = 63
     }
     	// This is the last raster line in each of the 25 character rows
-        sta     VICBORDER				// 4
+	    nops(2)			// 4
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
         ldx		COLORTABLE + DISPOFF_TOP + row*8+7+0	// 4
@@ -228,7 +229,7 @@ TJEK:
 // =========================================================
 
     // 1st raster line in 25th text row is a Bad line, 40 cycles stolen, 23 remain
-    stx     VICBORDER			// 4
+	    nops(2)			// 4
     stx     VICBGCOLOR			// 4
     nops(3)						// 6
     nops(3)						// 6
@@ -236,7 +237,7 @@ TJEK:
 //    bit		$02 
 
 .for (var line = 1; line < 5; line++) {
-    sta     VICBORDER	// 4
+	    nops(2)			// 4
 	sta     VICBGCOLOR	// 4
     lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
 	nops(3)			// 6
@@ -254,7 +255,7 @@ TJEK:
 
 // --- Third-last line: open border trick ---
 PHASE2_OPENBORDER:
-        sta     VICBORDER	// 4
+	    nops(2)			// 4
         sta     VICBGCOLOR	// 4
         
         // Open top/bottom border trick should on raster lines 248-250
@@ -277,7 +278,7 @@ PHASE2_OPENBORDER:
 
 // --- Penultimate line: normal ---
 PHASE2_PENULTIMATE:
-        sta     VICBORDER							// 4
+	    nops(2)			// 4
         sta     VICBGCOLOR							// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
 		nops(3) // 6
@@ -295,7 +296,7 @@ PHASE2_PENULTIMATE:
 
 // --- Last line: normal ---
 PHASE2_LAST:
-        sta     VICBORDER			// 4
+	    nops(2)			// 4
         sta     VICBGCOLOR			// 4
 		nops(3)					// 6
 		nops(3)					// 6
@@ -322,7 +323,7 @@ PHASE3_JMP:
 
 PHASE3_LOOP:
 .for (var i = 0; i < 37; i++) {
-        sta     VICBORDER
+	    nops(2)			// 4
         sta     VICBGCOLOR
         lda     COLORTABLE + DISPOFF_TOP + 25*8+i
         nops(3)
