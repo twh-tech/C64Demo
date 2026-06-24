@@ -31,7 +31,7 @@ INIT_VIC_AND_IRQ:
         sta     VICIRQFLAG
         
         // Clear high raster bit, enable display
-        lda #DISPLAYOFF
+        lda #DISPLAYON
 		sta VICICR
         
         // Disable CIA1 timer IRQ entirely
@@ -173,17 +173,13 @@ SJASK: // LIN=27 ($1b), CYC=59
         nops(22)
 		bit		$02
 		//ldx #$00
-	
-        
-
-
 
 PHASE2_ENTRY:
-.for (var row = 0; row < 24; row++) {
+.for (var row = 0; row < 22; row++) {
 	    // --- Bad line: first line of the row, 40 cycles stolen, 23 remain ---
 TJEK:
 	    stx     VICBGCOLOR			// 4
-		nops(8)						// 6
+		nops(8)						// 16
 		
 //		nops(20)	// These two lines can be used if we blank the screen and have no bad lines
 //	    bit		$02
@@ -192,20 +188,80 @@ TJEK:
     .for (var line = 1; line < 7; line++) {
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+line	// 4   
-		nops(26)						// 2
-        bit $02//bcc     *+2				// 3	total = 63
+		nops(26)						// 52
+        bit $02							// 3	total = 63
     }
     	// This is the last raster line in each of the 25 character rows
         sta     VICBGCOLOR				// 4
         lda     COLORTABLE + DISPOFF_TOP + row*8+7+1	// 4
         ldx		COLORTABLE + DISPOFF_TOP + row*8+7+0	// 4
+		nops(20)					// 40
+		ldy		SCROLLX			// 4
+        sty     VICXSCROLL		// 4
+
+        bit $02//bcc     *+2				// 3	total = 63
+}
+
+// =========================================================
+// Row 22: 7 normal lines and one that enables screen (in row 22)
+// =========================================================
+ROW22:
+		// First line (bad line) in row 22
+	    stx     VICBGCOLOR			// 4
+		nops(8)						// 16
+		
+		// These are 6 normal lines (in row 22)
+    .for (var line = 1; line < 7; line++) {
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + 22*8+line	// 4   
+		nops(26)						// 52
+        bit $02							// 3	total = 63
+    }
+
+		// This is the last raster line in row 22
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + 22*8+7+1	// 4
+        ldx		COLORTABLE + DISPOFF_TOP + 22*8+7+0	// 4
+		nops(20)					// 44
+		// enable DEN bit so scroll text can show
+		//ldy		#$1b	// 2
+		//sty		VICICR	// 4
+
+		// set the smooth scroll
+		ldy		SCROLLX			// 4
+        sty     VICXSCROLL		// 4
+
+        bit $02//bcc     *+2				// 3	total = 63
+
+
+// =========================================================
+// Row 23: 1 bad line, 7 normal lines (in row 23)
+// =========================================================
+ROW23:
+		// This is the bad line
+	    stx     VICBGCOLOR			// 4
+		nops(8)						// 6
+
+		// These are 6 normal lines (in row 23)
+    .for (var line = 1; line < 7; line++) {
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + 23*8+line	// 4   
+		nops(26)						// 52
+        bit $02							// 3	total = 63
+    }
+
+		// This is the last raster line in row 23
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + 23*8+7+1	// 4
+        ldx		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
 		nop
 		nops(19)					// 4
 		ldy		SCROLLX			// 4
         sty     VICXSCROLL		// 4
 
         bit $02//bcc     *+2				// 3	total = 63
-}
+
+
 
 // =========================================================
 // Row 24 — special last row: 1 bad line, 4 normal lines, open-border line, 2 normal lines

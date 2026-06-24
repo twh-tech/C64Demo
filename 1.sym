@@ -148,6 +148,8 @@
 .label PHASE3_START_IDX=$eb
 .label IRQHANDLER=$426b
 .label PRELOAD_A=$4268
+.label ROW22=$5cf6
+.label ROW23=$5df2
 .label BAR_YPOS=$3200
 .label BAR_TYPE=$320f
 .label DISABLESPRITES=$0
