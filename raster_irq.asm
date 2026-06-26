@@ -166,24 +166,28 @@ SJASK: // LIN=27 ($1b), CYC=59
 }
 		// This is the last rasterline in Phase1 before the screen area
         sta     VICBGCOLOR		// 4
-        lda     COLORTABLE+34+1	// 4   this is used in the raster line after the next raster line
-        ldx		COLORTABLE+34   // 4   this is for the next raster line
-        
+        lda		COLORTABLE+34   // 4   this is for the next raster line
 		ldy     #$18            // 2  ADD
         sty     VICICR          // 4  ADD — prime YSCROLL=0 before PHASE2_ENTRY
-        nops(18)                // 36 
-        bit     $02             // 3 = 63
+        nops(14)                // 28
+        //nops(3)
+        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
+        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
+        stx     VICXSCROLL      // 4   -> write lands on cycle 17
+        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
+        bit     $02             // 3  Total = 57 (which is 6 cycles too few)
 PHASE2_ENTRY:
 .for (var row = 0; row < 22; row++) {
     .for (var line = 0; line < 8; line++) {
         .var isArm = (row == 21 && line == 7)
         .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
-
         .if (line == 0) {
-        stx     VICBGCOLOR
+        sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        nops(25)
+        lda     COLORTABLE+DISPOFF_TOP + row*8
+        nops(23)
+        
         bit     $02
         } else { .if (line < 7) {
         sta     VICBGCOLOR
@@ -191,14 +195,17 @@ PHASE2_ENTRY:
         sty     VICICR
         lda     COLORTABLE + DISPOFF_TOP + row*8+line
         nops(23)
+//        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
+//        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
+//        stx     VICXSCROLL      // 4   -> write lands on cycle 17
+//        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit     $02
         } else {
         sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + row*8+7+1
-        ldx     COLORTABLE + DISPOFF_TOP + row*8+7+0
-        nops(17)
+        lda     COLORTABLE + DISPOFF_TOP + row*8+7+0
+        nops(19)
         ldy     SCROLLX
         sty     VICXSCROLL
         bit     $02
@@ -214,10 +221,11 @@ ROW22:
         .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
 
         .if (line == 0) {
-        stx     VICBGCOLOR
+        sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        nops(25)
+        lda     COLORTABLE + DISPOFF_TOP + 22*8
+        nops(23)
         bit     $02
         } else { .if (line < 7) {
         sta     VICBGCOLOR
