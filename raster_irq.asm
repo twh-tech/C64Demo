@@ -170,7 +170,7 @@ SJASK: // LIN=27 ($1b), CYC=59
 		ldy     #$18            // 2  ADD
         sty     VICICR          // 4  ADD — prime YSCROLL=0 before PHASE2_ENTRY
         nops(14)                // 28
-        //nops(3)
+nops(3)
         ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
         ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
         stx     VICXSCROLL      // 4   -> write lands on cycle 17
@@ -186,28 +186,35 @@ PHASE2_ENTRY:
         ldy     #d011
         sty     VICICR
         lda     COLORTABLE+DISPOFF_TOP + row*8
-        nops(23)
-        
+        nops(17)
+        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
+        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
+        stx     VICXSCROLL      // 4   -> write lands on cycle 17
+        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit     $02
         } else { .if (line < 7) {
         sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
         lda     COLORTABLE + DISPOFF_TOP + row*8+line
-        nops(23)
-//        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
-//        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
-//        stx     VICXSCROLL      // 4   -> write lands on cycle 17
-//        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
+        nops(17)
+        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
+        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
+        stx     VICXSCROLL      // 4   -> write lands on cycle 17
+        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit     $02
         } else {
         sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
         lda     COLORTABLE + DISPOFF_TOP + row*8+7+0
-        nops(19)
+        nops(13)
         ldy     SCROLLX
         sty     VICXSCROLL
+        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
+        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
+        stx     VICXSCROLL      // 4   -> write lands on cycle 17
+        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit     $02
         } }
     }
@@ -240,10 +247,10 @@ ROW22:
         sty     VICICR
         lda     COLORTABLE + DISPOFF_TOP + 22*8+7+1
         ldx     COLORTABLE + DISPOFF_TOP + 22*8+7+0
-        nops(17)
         ldy     SCROLLX
         sty     VICXSCROLL
         bit     $02
+        nops(17)
         } }
     }
 
@@ -278,7 +285,7 @@ ROW23:
 // =========================================================
 // Row 24 — special last row: 1 bad line, 4 normal lines, open-border line, 2 normal lines
 // =========================================================
-
+ROW24:
     // 1st raster line in 25th text row is a Bad line, 43 cycles stolen, 20 remain
     stx     VICBGCOLOR			// 4
     nops(8)						// 16
