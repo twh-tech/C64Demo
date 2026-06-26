@@ -1,5 +1,5 @@
 // scroll_engine.asm
-.label SCROLLROW       = 23
+.label SCROLLROW       = 0
 .label SCROLLRAM       = $0400 + SCROLLROW * 40
 .label SCROLLRAM2      = $0400 + (SCROLLROW+1) * 40
 
