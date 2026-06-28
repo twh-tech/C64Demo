@@ -170,7 +170,8 @@ SJASK: // LIN=27 ($1b), CYC=59
 		ldy     #$18            // 2  ADD
         sty     VICICR          // 4  ADD — prime YSCROLL=0 before PHASE2_ENTRY
         nops(14)                // 28
-nops(3)
+nops(3) // If these three nops are present, the open side border trick works everywhere it is used, but the scroll text is invisible. If I remove them, the scroll text works perfectly, but the open side border trick of all remaining raster lines does not work (still works in the top border/Phase1) 
+
         ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
         ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
         stx     VICXSCROLL      // 4   -> write lands on cycle 17
@@ -245,12 +246,12 @@ ROW22:
         sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + 22*8+7+1
-        ldx     COLORTABLE + DISPOFF_TOP + 22*8+7+0
+        //lda     COLORTABLE + DISPOFF_TOP + 22*8+7+1
+        lda     COLORTABLE + DISPOFF_TOP + 22*8+7+0
         ldy     SCROLLX
         sty     VICXSCROLL
         bit     $02
-        nops(17)
+        nops(19)
         } }
     }
 
@@ -259,8 +260,9 @@ ROW22:
 // =========================================================
 ROW23:
 		// This is the bad line
-	    stx     VICBGCOLOR			// 4
-		nops(8)						// 6
+	    sta     VICBGCOLOR			// 4
+		lda		COLORTABLE + DISPOFF_TOP + 23*8
+		nops(6)						// 6
 
 		// These are 6 normal lines (in row 23)
     .for (var line = 1; line < 7; line++) {
@@ -272,9 +274,9 @@ ROW23:
 
 		// This is the last raster line in row 23
         sta     VICBGCOLOR				// 4
-        lda     COLORTABLE + DISPOFF_TOP + 23*8+7+1	// 4
-        ldx		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
-		nops(20)				// 4
+        //lda     COLORTABLE + DISPOFF_TOP + 23*8+7+1	// 4
+        lda		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
+		nops(22)				// 4
 		ldy		SCROLLX			// 4
         sty     VICXSCROLL		// 4
 
@@ -287,8 +289,9 @@ ROW23:
 // =========================================================
 ROW24:
     // 1st raster line in 25th text row is a Bad line, 43 cycles stolen, 20 remain
-    stx     VICBGCOLOR			// 4
-    nops(8)						// 16
+    sta     VICBGCOLOR			// 4
+    lda		COLORTABLE + DISPOFF_TOP + 24*8			// 4
+    nops(6)						// 16
 
 .for (var line = 1; line < 5; line++) {
 	sta     VICBGCOLOR								// 4
