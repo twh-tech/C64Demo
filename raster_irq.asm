@@ -164,84 +164,56 @@ LAST2:
         sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit		$02				// 3
 }
-		// This is the last rasterline in Phase1 before the screen area
-        sta     VICBGCOLOR		// 4
-//        lda		COLORTABLE+34   // 4   this is for the next raster line
-		ldy     #$18            // 2  ADD
-        sty     VICICR          // 4  ADD — prime YSCROLL=0 before PHASE2_ENTRY
-        nops(22)                // 28
-nops(2) // If these three nops are present, the open side border trick works everywhere it is used, but the scroll text is invisible. If I remove them, the scroll text works perfectly, but the open side border trick of all remaining raster lines does not work (still works in the top border/Phase1) 
-
-        bit     $02             // 3  Total = 57 (which is 6 cycles too few)
+PHASE1_LAST:
+        sta     VICBGCOLOR      // 4
+        ldy     #$18            // 2
+        sty     VICICR          // 4
+        nops(24)                // 48
+        ldy     #$18            // 2  prepare d011 for row0/line0
+        bit     $02             // 3  total = 63
 PHASE2_ENTRY:
 .for (var row = 0; row < 22; row++) {
     .for (var line = 0; line < 8; line++) {
-        .var isArm = (row == 21 && line == 7)
-        .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
-        .if (line == 0) {
-        //sta     VICBGCOLOR        
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE+DISPOFF_TOP + row*8
-        nops(25)
-        bit     $02
-        } else { .if (line < 7) {
-        //sta     VICBGCOLOR
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + row*8+line
-        nops(25)
-        bit     $02
+        .var d011 = $18 | (line == 5 ? 1 : 0)
+        .var nextLine = (line == 7) ? 0 : line + 1
+        .var nextD011 = $18 | (nextLine == 5 ? 1 : 0)
+        .if (line < 7) {
+        sty     VICICR          // 4
+        nops(27)                // 54
+        ldy     #nextD011       // 2
+        bit     $02             // 3  total = 63
         } else {
-        //sta     VICBGCOLOR
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + row*8+7+0
-        nops(21)
-        //ldy     SCROLLX
-        //sty     VICXSCROLL
-        nops(4)
-        bit     $02
-        } }
+        sty     VICICR          // 4
+        nops(27)                // 54
+        ldy     #nextD011       // 2  nextD011 for line7 is always $18 (nextLine=0)
+        bit     $02             // 3  total = 63
+        }
     }
 }
 // =========================================================
-// Row 22: 7 normal lines and one that enables screen (in row 22)
+// Row 22: 
 // =========================================================
 ROW22:
     .for (var line = 0; line < 8; line++) {
-        .var isArm = (line == 7)
-        .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
-
-        .if (line == 0) {
-        //sta     VICBGCOLOR
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + 22*8
-        nops(25)
-        bit     $02
-        } else { .if (line < 7) {
-        //sta     VICBGCOLOR
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + 22*8+line
-        nops(25)
-        bit     $02
+        .var nextLine = (line == 7) ? 0 : line + 1
+        .var nextD011 = $18 | (nextLine == 5 ? 1 : 0)
+        .if (line < 6) {
+        sty     VICICR          // 4
+        nops(27)                // 54
+        ldy     #nextD011       // 2
+        bit     $02             // 3  total = 63
+        } else { .if (line == 6) {
+        sty     VICICR          // 4
+        nops(23)                // 46
+        ldy     SCROLLX         // 4
+        sty     VICXSCROLL      // 4
+        ldy     #nextD011       // 2
+        bit     $02             // 3  total = 63
         } else {
-        //sta     VICBGCOLOR
-        ldy     #d011
-        sty     VICICR
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + 22*8+7+0
-        ldy     SCROLLX
-        sty     VICXSCROLL
-        bit     $02
-        nops(21)
+        nops(27)                // 54
+        ldy     #$1B            // 2
+        sty     VICICR          // 4
+        bit     $02             // 3  total = 63
         } }
     }
 
@@ -323,7 +295,7 @@ PHASE2_LAST:
         lda     #%00000000							// 2
         sta     VIC_SPRITE_ENABLE					// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
-        nops(1) // hack to compensate for the nops we removed at the end of phase1. Otherwise phase3's open side border trick will notfall on the wrong cycles and therefore not work.
+        //nops(1) // hack to compensate for the nops we removed at the end of phase1. Otherwise phase3's open side border trick will notfall on the wrong cycles and therefore not work.
 PHASE3_JMP:        
         jmp     PHASE3_LOOP		// 3	Total = 62
 
