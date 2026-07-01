@@ -166,9 +166,10 @@ LAST2:
 }
 PHASE1_LAST:
         sta     VICBGCOLOR      // 4
+        lda     COLORTABLE+33+1	// 4
         ldy     #$18            // 2
         sty     VICICR          // 4
-        nops(24)                // 48
+        nops(22)                // 48
         ldy     #$18            // 2  prepare d011 for row0/line0
         bit     $02             // 3  total = 63
 PHASE2_ENTRY:
@@ -179,12 +180,16 @@ PHASE2_ENTRY:
         .var nextD011 = $18 | (nextLine == 5 ? 1 : 0)
         .if (line < 7) {
         sty     VICICR          // 4
-        nops(27)                // 54
+        sta		VICBGCOLOR		// 4
+        lda     COLORTABLE+DISPOFF_TOP + row*8+line // 4
+        nops(23)                // 46
         ldy     #nextD011       // 2
         bit     $02             // 3  total = 63
         } else {
         sty     VICICR          // 4
-        nops(27)                // 54
+        sta		VICBGCOLOR		// 4
+        lda     COLORTABLE+DISPOFF_TOP + row*8+line // 4
+        nops(23)                // 46
         ldy     #nextD011       // 2  nextD011 for line7 is always $18 (nextLine=0)
         bit     $02             // 3  total = 63
         }
@@ -199,18 +204,24 @@ ROW22:
         .var nextD011 = $18 | (nextLine == 5 ? 1 : 0)
         .if (line < 6) {
         sty     VICICR          // 4
-        nops(27)                // 54
+        sta		VICBGCOLOR		// 4
+        lda     COLORTABLE+DISPOFF_TOP + 22*8+line  // 4
+        nops(23)                // 46
         ldy     #nextD011       // 2
         bit     $02             // 3  total = 63
         } else { .if (line == 6) {
         sty     VICICR          // 4
-        nops(23)                // 46
+        sta		VICBGCOLOR		// 4
+        lda     COLORTABLE+DISPOFF_TOP + 22*8+line  // 4
+        nops(19)                // 38
         ldy     SCROLLX         // 4
         sty     VICXSCROLL      // 4
         ldy     #nextD011       // 2
         bit     $02             // 3  total = 63
         } else {
-        nops(27)                // 54
+        sta		VICBGCOLOR		// 4
+        lda     COLORTABLE+DISPOFF_TOP + 22*8+line  // 4
+        nops(23)                // 46
         ldy     #$1B            // 2
         sty     VICICR          // 4
         bit     $02             // 3  total = 63
@@ -222,25 +233,22 @@ ROW22:
 // =========================================================
 ROW23:
 		// This is the bad line
-	    //sta     VICBGCOLOR			// 4
-		//lda		COLORTABLE + DISPOFF_TOP + 23*8
-		nops(4)
+	    sta     VICBGCOLOR			// 4
+		lda		COLORTABLE + DISPOFF_TOP + 23*8
 		nops(6)						// 12
 
 		// These are 6 normal lines (in row 23)
     .for (var line = 1; line < 7; line++) {
-        //sta     VICBGCOLOR				// 4
-        //lda     COLORTABLE + DISPOFF_TOP + 23*8+line	// 4   
-        nops(4)
+        sta     VICBGCOLOR				// 4
+        lda     COLORTABLE + DISPOFF_TOP + 23*8+line	// 4   
 		nops(26)						// 52
         bit $02							// 3	total = 63
     }
 
 		// This is the last raster line in row 23
-        //sta     VICBGCOLOR				// 4
-        //lda		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
-        nops(4)
-		nops(22)				// 4
+        sta     VICBGCOLOR				// 4
+        lda		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
+		nops(22)					// 44
 		//ldy		SCROLLX			// 4
         //sty     VICXSCROLL		// 4
         nops(4)
@@ -252,44 +260,38 @@ ROW23:
 // =========================================================
 ROW24:
     // 1st raster line in 25th text row is a Bad line, 43 cycles stolen, 20 remain
-    //sta     VICBGCOLOR			// 4
-    //lda		COLORTABLE + DISPOFF_TOP + 24*8			// 4
-	nops(4)
+    sta     VICBGCOLOR			// 4
+    lda		COLORTABLE + DISPOFF_TOP + 24*8			// 4
     nops(6)						// 12
 
 .for (var line = 1; line < 5; line++) {
-	//sta     VICBGCOLOR								// 4
-    //lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
-	nops(4)
+	sta     VICBGCOLOR								// 4
+    lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
     nops(26)										// 52
     bit $02											// 3
 }
 
 // --- Third-last line: open border trick ---
 PHASE2_OPENBORDER:
-        //sta     VICBGCOLOR	// 4
-        nops(2)
-        
+        sta     VICBGCOLOR	// 4
         // Open top/bottom border trick should on raster lines 248-250
         lda     #$13		// 2
         sta     VICICR		// 4
-        //lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
-		nops(25)		// 46
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
+		nops(23)		// 46
 		bit		$02		// 3
 
 // --- Penultimate line: normal ---
 PHASE2_PENULTIMATE:
-        //sta     VICBGCOLOR							// 4
-        nops(2)
-        //lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
-		nops(28) // 52
-		bit		$02
+        sta     VICBGCOLOR							// 4
+        lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
+		nops(26) 									// 52
+		bit		$02									// 3	Total = 63
 
 // --- Last line: normal ---
 PHASE2_LAST:
-        //sta     VICBGCOLOR			// 4
-        nops(2)
-		nops(23)					// 46
+        sta     VICBGCOLOR			// 4
+		nops(23)					// 42
 
 		// disable sprites to avoid ghost lines in the bottom
         lda     #%00000000							// 2
