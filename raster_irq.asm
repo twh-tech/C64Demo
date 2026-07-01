@@ -152,7 +152,7 @@ SJASK: // LIN=27 ($1b), CYC=59
         sty     VICXSCROLL          // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit		$02					// 3
 }
-
+LAST2:
 // Last two raster lines of Phase1
 .for (var i = 32; i < (DISPOFF_TOP-1-1); i++) {
         sta     VICBGCOLOR		// 4
@@ -166,16 +166,12 @@ SJASK: // LIN=27 ($1b), CYC=59
 }
 		// This is the last rasterline in Phase1 before the screen area
         sta     VICBGCOLOR		// 4
-        lda		COLORTABLE+34   // 4   this is for the next raster line
+//        lda		COLORTABLE+34   // 4   this is for the next raster line
 		ldy     #$18            // 2  ADD
         sty     VICICR          // 4  ADD — prime YSCROLL=0 before PHASE2_ENTRY
-        nops(14)                // 28
-nops(3) // If these three nops are present, the open side border trick works everywhere it is used, but the scroll text is invisible. If I remove them, the scroll text works perfectly, but the open side border trick of all remaining raster lines does not work (still works in the top border/Phase1) 
+        nops(22)                // 28
+nops(2) // If these three nops are present, the open side border trick works everywhere it is used, but the scroll text is invisible. If I remove them, the scroll text works perfectly, but the open side border trick of all remaining raster lines does not work (still works in the top border/Phase1) 
 
-        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
-        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
-        stx     VICXSCROLL      // 4   -> write lands on cycle 17
-        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
         bit     $02             // 3  Total = 57 (which is 6 cycles too few)
 PHASE2_ENTRY:
 .for (var row = 0; row < 22; row++) {
@@ -183,39 +179,31 @@ PHASE2_ENTRY:
         .var isArm = (row == 21 && line == 7)
         .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
         .if (line == 0) {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR        
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE+DISPOFF_TOP + row*8
-        nops(17)
-        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
-        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
-        stx     VICXSCROLL      // 4   -> write lands on cycle 17
-        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
+        nops(2)
+        //lda     COLORTABLE+DISPOFF_TOP + row*8
+        nops(25)
         bit     $02
         } else { .if (line < 7) {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + row*8+line
-        nops(17)
-        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
-        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
-        stx     VICXSCROLL      // 4   -> write lands on cycle 17
-        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + row*8+line
+        nops(25)
         bit     $02
         } else {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + row*8+7+0
-        nops(13)
-        ldy     SCROLLX
-        sty     VICXSCROLL
-        ldx     #D016_WIDE      // 2   re-arm the right edge at the far position
-        ldy     #D016_NARROW    // 2   offsets 55-56  (2 cycles)
-        stx     VICXSCROLL      // 4   -> write lands on cycle 17
-        sty     VICXSCROLL      // 4   offsets 57-60  (4 cycles, write lands on cycle 56)
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + row*8+7+0
+        nops(21)
+        //ldy     SCROLLX
+        //sty     VICXSCROLL
+        nops(4)
         bit     $02
         } }
     }
@@ -229,29 +217,31 @@ ROW22:
         .var d011 = isArm ? $1B : ($18 | (line == 5 ? 1 : 0))
 
         .if (line == 0) {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + 22*8
-        nops(23)
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + 22*8
+        nops(25)
         bit     $02
         } else { .if (line < 7) {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        lda     COLORTABLE + DISPOFF_TOP + 22*8+line
-        nops(23)
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + 22*8+line
+        nops(25)
         bit     $02
         } else {
-        sta     VICBGCOLOR
+        //sta     VICBGCOLOR
         ldy     #d011
         sty     VICICR
-        //lda     COLORTABLE + DISPOFF_TOP + 22*8+7+1
-        lda     COLORTABLE + DISPOFF_TOP + 22*8+7+0
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + 22*8+7+0
         ldy     SCROLLX
         sty     VICXSCROLL
         bit     $02
-        nops(19)
+        nops(21)
         } }
     }
 
@@ -260,28 +250,29 @@ ROW22:
 // =========================================================
 ROW23:
 		// This is the bad line
-	    sta     VICBGCOLOR			// 4
-		lda		COLORTABLE + DISPOFF_TOP + 23*8
-		nops(6)						// 6
+	    //sta     VICBGCOLOR			// 4
+		//lda		COLORTABLE + DISPOFF_TOP + 23*8
+		nops(4)
+		nops(6)						// 12
 
 		// These are 6 normal lines (in row 23)
     .for (var line = 1; line < 7; line++) {
-        sta     VICBGCOLOR				// 4
-        lda     COLORTABLE + DISPOFF_TOP + 23*8+line	// 4   
+        //sta     VICBGCOLOR				// 4
+        //lda     COLORTABLE + DISPOFF_TOP + 23*8+line	// 4   
+        nops(4)
 		nops(26)						// 52
         bit $02							// 3	total = 63
     }
 
 		// This is the last raster line in row 23
-        sta     VICBGCOLOR				// 4
-        //lda     COLORTABLE + DISPOFF_TOP + 23*8+7+1	// 4
-        lda		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
+        //sta     VICBGCOLOR				// 4
+        //lda		COLORTABLE + DISPOFF_TOP + 23*8+7+0	// 4
+        nops(4)
 		nops(22)				// 4
-		ldy		SCROLLX			// 4
-        sty     VICXSCROLL		// 4
-
+		//ldy		SCROLLX			// 4
+        //sty     VICXSCROLL		// 4
+        nops(4)
         bit $02					// 3	total = 63
-
 
 
 // =========================================================
@@ -289,52 +280,56 @@ ROW23:
 // =========================================================
 ROW24:
     // 1st raster line in 25th text row is a Bad line, 43 cycles stolen, 20 remain
-    sta     VICBGCOLOR			// 4
-    lda		COLORTABLE + DISPOFF_TOP + 24*8			// 4
-    nops(6)						// 16
+    //sta     VICBGCOLOR			// 4
+    //lda		COLORTABLE + DISPOFF_TOP + 24*8			// 4
+	nops(4)
+    nops(6)						// 12
 
 .for (var line = 1; line < 5; line++) {
-	sta     VICBGCOLOR								// 4
-    lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
+	//sta     VICBGCOLOR								// 4
+    //lda     COLORTABLE + DISPOFF_TOP + 24*8+line	// 4
+	nops(4)
     nops(26)										// 52
     bit $02											// 3
 }
 
 // --- Third-last line: open border trick ---
 PHASE2_OPENBORDER:
-        sta     VICBGCOLOR	// 4
+        //sta     VICBGCOLOR	// 4
+        nops(2)
         
         // Open top/bottom border trick should on raster lines 248-250
         lda     #$13		// 2
         sta     VICICR		// 4
-        lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
-		nops(23)		// 46
+        //lda     COLORTABLE + DISPOFF_TOP + 24*8+5	// 4	
+		nops(25)		// 46
 		bit		$02		// 3
 
 // --- Penultimate line: normal ---
 PHASE2_PENULTIMATE:
-        sta     VICBGCOLOR							// 4
-        lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
-		nops(26) // 52
+        //sta     VICBGCOLOR							// 4
+        nops(2)
+        //lda     COLORTABLE + DISPOFF_TOP + 24*8+6	// 4
+		nops(28) // 52
 		bit		$02
 
 // --- Last line: normal ---
 PHASE2_LAST:
-        sta     VICBGCOLOR			// 4
+        //sta     VICBGCOLOR			// 4
+        nops(2)
 		nops(23)					// 46
 
 		// disable sprites to avoid ghost lines in the bottom
         lda     #%00000000							// 2
         sta     VIC_SPRITE_ENABLE					// 4
         lda     COLORTABLE + DISPOFF_TOP + 24*8+7	// 4
-
+        nops(1) // hack to compensate for the nops we removed at the end of phase1. Otherwise phase3's open side border trick will notfall on the wrong cycles and therefore not work.
 PHASE3_JMP:        
         jmp     PHASE3_LOOP		// 3	Total = 62
 
         // -------------------------------------------------------------------
         // PHASE3: raster bars for bottom border area
         // -------------------------------------------------------------------
-
 PHASE3_LOOP:
 .for (var i = 0; i < 37; i++) {
         sta     VICBGCOLOR
@@ -346,11 +341,7 @@ PHASE3_LOOP:
         sty     VICXSCROLL         // offsets 57-60  (4 cycles, write lands on cycle 56)
 //        ldy		COLORTABLE + DISPOFF_TOP + 25*8+i	// Just a test to get rid of a small "overwrite"
         bit		$02
-
 }
-
-
-
 
 		// -------------------------------------------------------
         // Runs directly after Phase3 (bottom border raster bars).
@@ -527,6 +518,3 @@ delay2:
         nop
     }
 }
-		// Trick to turn 4 or 6 cycles into 5
-		//		clc
-		//		bcc *+2
